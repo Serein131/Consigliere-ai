@@ -9,7 +9,7 @@ from google.genai import types
 
 app = Flask(__name__)
 
-# 关闭 Werkzeug 默认的请求体 상세日志，确保服务器端不记录敏感请求内容
+# 关闭 Werkzeug 默认的请求体日志，确保服务器端不记录敏感请求内容
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
@@ -39,7 +39,7 @@ def server_fallback_redact(text: str) -> dict:
     count = len(re.findall(r'\[(?:REDACTED_\w+|COMPANY_ENTITY)\]', redacted))
     return {"sanitized_text": redacted, "redaction_count": count}
 
-# 升级版结构化推理 Schema：区分【规则引用】、【事实】、【推断】、【未知信息】与【无风险识别】
+# 结构化推理 Schema：区分【规则引用】、【事实】、【推断】、【未知信息】与【无风险识别】
 tactical_schema = types.Schema(
     type=types.Type.OBJECT,
     properties={
@@ -120,30 +120,35 @@ def analyze_negotiation():
     """
 
     try:
-        model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-        try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=f"待分析谈判输入（已脱敏）: {sanitized_text}",
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.15,
-                    response_mime_type="application/json",
-                    response_schema=tactical_schema,
-                ),
-            )
-        except Exception:
-            model_name = "gemini-2.0-flash"
-            response = client.models.generate_content(
-                model=model_name,
-                contents=f"待分析谈判输入（已脱敏）: {sanitized_text}",
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.15,
-                    response_mime_type="application/json",
-                    response_schema=tactical_schema,
-                ),
-            )
+        # 优先调用 Google 官方最新提示的 gemini-3.8-flash 模型，并配置多模型自动降级兜底
+        candidate_models = [
+            os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"),
+            "gemini-3.8-flash",
+            "gemini-2.5-flash"
+        ]
+        response = None
+        model_name = None
+        last_err = None
+
+        for candidate in dict.fromkeys(candidate_models):
+            try:
+                model_name = candidate
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=f"待分析谈判输入（已脱敏）: {sanitized_text}",
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.15,
+                        response_mime_type="application/json",
+                        response_schema=tactical_schema,
+                    ),
+                )
+                break
+            except Exception as loop_err:
+                last_err = loop_err
+
+        if not response:
+            raise last_err
 
         tactical_output = json.loads(response.text)
         latency_ms = round((time.perf_counter() - start_time) * 1000)
@@ -422,3 +427,4 @@ def index():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
+
