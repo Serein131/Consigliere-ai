@@ -35,11 +35,11 @@ def server_fallback_redact(text: str) -> dict:
         '[COMPANY_ENTITY]',
         redacted
     )
-    count = len(re.findall(r'\[(?:REDACTED_\w+\vert{}COMPANY_ENTITY)\]', redacted))
+    count = len(re.findall(r'\[(?:REDACTED_\w+|COMPANY_ENTITY)\]', redacted))
     return {"sanitized_text": redacted, "redaction_count": count}
 
 def discover_available_flash_model(api_key: str) -> str:
-    conn = http.client.HTTPSConnection(API_HOST, timeout=5)
+    conn = http.client.HTTPSConnection(API_HOST, timeout=6)
     try:
         conn.request("GET", f"/v1beta/models?key={api_key}")
         resp = conn.getresponse()
@@ -57,34 +57,35 @@ def discover_available_flash_model(api_key: str) -> str:
         methods = m.get("supportedGenerationMethods", [])
         if "generateContent" in methods and "flash" in name.lower() and "2.0-flash" not in name.lower() and "2.5-flash" not in name.lower():
             flash_candidates.append(name)
+    # 优先选择轻量且高速的 flash 模型
     for preferred in flash_candidates:
-        if ("3.8" in preferred or "3" in preferred) and "tts" not in preferred and "image" not in preferred:
+        if "flash-lite" in preferred:
             return preferred
-    return flash_candidates[0] if flash_candidates else "gemini-3.8-flash"
+    for preferred in flash_candidates:
+        if "flash" in preferred and "tts" not in preferred and "image" not in preferred:
+            return preferred
+    return flash_candidates[0] if flash_candidates else "gemini-3.5-flash-lite"
 
-def call_gemini_rest(api_key: str, model_name: str, system_instruction: str, user_text: str, use_thinking_zero: bool = True) -> dict:
+def call_gemini_rest(api_key: str, model_name: str, system_instruction: str, user_text: str) -> dict:
+    """标准纯净 REST 调用，放宽超时至 14 秒，不带冲突的 thinkingConfig 避免 400 错误"""
     path = f"/v1beta/models/{model_name}:generateContent?key={api_key}"
-    gen_config = {
-        "temperature": 0.15,
-        "responseMimeType": "application/json"
-    }
-    if use_thinking_zero and ("2.5" in model_name or "3" in model_name):
-        gen_config["thinkingConfig"] = {"thinkingBudget": 0}
-
     body = {
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "contents": [{"role": "user", "parts": [{"text": user_text}]}],
-        "generationConfig": gen_config
+        "generationConfig": {
+            "temperature": 0.15,
+            "responseMimeType": "application/json"
+        }
     }
     payload_bytes = json.dumps(body).encode("utf-8")
 
-    conn = http.client.HTTPSConnection(API_HOST, timeout=8)
+    conn = http.client.HTTPSConnection(API_HOST, timeout=14)
     try:
         conn.request("POST", path, body=payload_bytes, headers={"Content-Type": "application/json"})
         resp = conn.getresponse()
         raw = resp.read().decode("utf-8", errors="ignore")
         if resp.status != 200:
-            err = RuntimeError(f"HTTP_{resp.status}:{raw[:200]}")
+            err = RuntimeError(f"HTTP_{resp.status}:{raw[:220]}")
             err.status_code = resp.status
             err.err_body = raw
             raise err
@@ -170,7 +171,7 @@ Objective: The user dictated a 60s summary right after the meeting. Cross-examin
         if session_context.get("in_deal"):
             session_history_str += f"\n[STAGE 2 IN-DEAL HISTORY (Live Context)]: {json.dumps(session_context['in_deal'], ensure_ascii=False)}"
 
-    system_instruction = f"""You are Consigliere AI (v4.1), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
+    system_instruction = f"""You are Consigliere AI (v4.2), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
 You replace illegal/intrusive full-room audio recording with a 3-stage cognitive defense architecture.
 
 USER STRATEGIC PROFILE (MEMORY BANK):
@@ -197,39 +198,44 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
 
     user_prompt = f"[{phase.upper()} INPUT (Sanitized)]: {sanitized_text}{session_history_str}"
 
-    # 优先使用官方提示中活跃的 3.8-flash，备用 3.5-flash-lite 与 3-flash-preview
-    primary_model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
-    candidate_models = [primary_model, "gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview"]
+    # 优先使用极速轻量且稳定的 3.5-flash-lite，其次是 3.8-flash 和 3-flash-preview
+    primary_model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+    candidate_models = [primary_model, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3-flash-preview"]
     used_model = None
     raw_api_resp = None
     error_logs = []
+    has_429 = False
 
     for candidate in dict.fromkeys(candidate_models):
         try:
             used_model = candidate
-            raw_api_resp = call_gemini_rest(api_key, candidate, system_instruction, user_prompt, use_thinking_zero=True)
+            raw_api_resp = call_gemini_rest(api_key, candidate, system_instruction, user_prompt)
             break
         except Exception as e:
             status_code = getattr(e, "status_code", None)
-            err_body = getattr(e, "err_body", "")
-            if status_code == 400 and "thinking" in err_body.lower():
-                try:
-                    raw_api_resp = call_gemini_rest(api_key, candidate, system_instruction, user_prompt, use_thinking_zero=False)
-                    break
-                except Exception as retry_err:
-                    error_logs.append(f"{candidate}(retry): {str(retry_err)}")
+            if status_code == 429:
+                has_429 = True
+                error_logs.append(f"{candidate}: 配额超限 (429)")
+            elif "timed out" in str(e).lower():
+                error_logs.append(f"{candidate}: 生成超时 (>14s)")
             else:
-                error_logs.append(f"{candidate}: {str(e)}")
+                error_logs.append(f"{candidate}: {str(e)[:70]}")
 
     if not raw_api_resp:
         try:
             discovered = discover_available_flash_model(api_key)
-            used_model = discovered
-            raw_api_resp = call_gemini_rest(api_key, discovered, system_instruction, user_prompt, use_thinking_zero=False)
+            if discovered not in candidate_models:
+                used_model = discovered
+                raw_api_resp = call_gemini_rest(api_key, discovered, system_instruction, user_prompt)
         except Exception as disc_err:
-            return jsonify({
-                "error": f"Model invocation failed: {'; '.join(error_logs)} | Probe: {str(disc_err)}"
-            }), 500
+            error_logs.append(f"Auto-Discovery: {str(disc_err)[:70]}")
+
+    if not raw_api_resp:
+        if has_429:
+            msg = "⚡ 触发 Google 免费 API 每分钟频次限制（Rate Limit 429）。免费版配额正在重置，请稍候 15~20 秒后再次点击即可正常推演！"
+        else:
+            msg = f"模型调用失败。详细状态: {'; '.join(error_logs)}"
+        return jsonify({"error": msg}), 500
 
     try:
         candidates = raw_api_resp.get("candidates", [])
@@ -261,7 +267,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v4.1 — Full-Cycle Game-Theoretic Chief of Staff</title>
+    <title>Consigliere AI v4.2 — Full-Cycle Game-Theoretic Chief of Staff</title>
     <style>
         body { background: #090a0f; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; padding: 20px; max-width: 880px; margin: auto; line-height: 1.5; }
         .badge { background: #1e293b; color: #38bdf8; padding: 3px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #0284c7; }
@@ -311,7 +317,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <body>
     <div class="header-row">
         <div>
-            <h2 style="margin:0 0 4px 0;">⚡ Consigliere AI <span class="badge">v4.1 — Full-Cycle Chief of Staff</span></h2>
+            <h2 style="margin:0 0 4px 0;">⚡ Consigliere AI <span class="badge">v4.2 — Full-Cycle Chief of Staff</span></h2>
             <span style="color:#94a3b8; font-size:13px;" id="subtitle_text">Solving the Recording Dilemma: 70% Pre-Deal Wargaming • 20% Stealth In-Deal • 10% Post-Deal Debrief</span>
         </div>
         <div class="lang-switch">
@@ -437,6 +443,7 @@ HTML_UI = r"""<!DOCTYPE html>
         let currentPhase = 'in_deal';
         let latestTacticalOutput = null;
         let isAgentRunning = false;
+        let lastExecutionTimestamp = 0;
 
         let sessionMemory = {
             pre_deal: null,
@@ -572,9 +579,9 @@ HTML_UI = r"""<!DOCTYPE html>
                                 <td>强制执行认识论三元拆解（事实/推断/未知），修复正则保护时间词，加入中英自适应。</td>
                             </tr>
                             <tr>
-                                <td><strong>v3.2 → v4.1</strong></td>
-                                <td>孤立单次请求缺乏跨阶段记忆；中文界面残留英文标题与字段。</td>
-                                <td>构建<strong>全周期三阶段会话链路</strong>（战前沙盘+战中暗号+战后邮件），强制 100% 语言纯度并新增一键复制/邮件唤起。</td>
+                                <td><strong>v3.2 → v4.2</strong></td>
+                                <td>孤立请求无跨阶段记忆；高频并发测试偶发 429 配额限制与超时。</td>
+                                <td>构建<strong>全周期三阶段会话链路</strong>，升级至 Google 官方推荐的 <code>gemini-3.5-flash-lite</code> 极速模型，放宽超时并加入前端防抖保护。</td>
                             </tr>
                         </tbody>
                     </table>
@@ -601,9 +608,9 @@ HTML_UI = r"""<!DOCTYPE html>
                                 <td>Enforced Epistemic Game Theory split (Facts / Inferences / Unknowns), refined regex to protect time units, and added EN/ZH auto-adaptation.</td>
                             </tr>
                             <tr>
-                                <td><strong>v3.2 → v4.1</strong></td>
-                                <td>Stages were isolated without memory chaining; Chinese UI leaked English phrases in headers and verdicts.</td>
-                                <td>Built <strong>Local Session Chaining</strong> across all 3 stages, enforced 100% language purity in Chinese mode, and added one-click copy/mailto triggers.</td>
+                                <td><strong>v3.2 → v4.2</strong></td>
+                                <td>Stages isolated; rapid speech triggering caused occasional 429 quota exhaustion or read timeouts.</td>
+                                <td>Integrated <strong>Local Session Chaining</strong>, migrated to official <code>gemini-3.5-flash-lite</code> with extended 14s timeout and request debouncing.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -758,9 +765,13 @@ HTML_UI = r"""<!DOCTYPE html>
                 recognition.onend = () => {
                     isListening = false;
                     document.getElementById('mic_btn').innerText = currentLang === 'zh' ? "🎤 开启本地语音口述" : "🎤 Dictate via Local Browser Speech";
-                    // 防抖检查：避免请求并发重叠触发限频
-                    if (!isAgentRunning && document.getElementById('input_text').value.trim()) {
-                        runAgent();
+                    const now = Date.now();
+                    // 防抖：间隔 2.5 秒以上且有实质内容才自动触发分析
+                    if (!isAgentRunning && (now - lastExecutionTimestamp > 2500)) {
+                        const txt = document.getElementById('input_text').value.trim();
+                        if (txt.length >= 4) {
+                            runAgent();
+                        }
                     }
                 };
             }
@@ -769,7 +780,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 recognition.lang = document.getElementById('voice_lang').value;
                 recognition.start();
                 isListening = true;
-                document.getElementById('mic_btn').innerText = currentLang === 'zh' ? "🛑 正在听音中..." : "🛑 Listening...";
+                document.getElementById('mic_btn').innerText = currentLang === 'zh' ? "🛑 正在听音中（点击立即停止并分析）..." : "🛑 Listening (Click to stop & analyze)...";
             } else {
                 recognition.stop();
             }
@@ -777,6 +788,12 @@ HTML_UI = r"""<!DOCTYPE html>
 
         async function runAgent() {
             if (isAgentRunning) return;
+            const now = Date.now();
+            if (now - lastExecutionTimestamp < 1500) {
+                return; // 防止毫秒级连击
+            }
+            lastExecutionTimestamp = now;
+
             const errBox = document.getElementById('error_box');
             const resBox = document.getElementById('result');
             const runBtn = document.getElementById('run_btn');
@@ -786,7 +803,7 @@ HTML_UI = r"""<!DOCTYPE html>
             runBtn.innerText = currentLang === 'zh' ? '⏳ 正在执行全周期博弈推演 (1~2秒)...' : '⏳ Running Game-Theoretic Deduction (1-2s)...';
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            const timeoutId = setTimeout(() => controller.abort(), 18000);
 
             try {
                 const rawText = document.getElementById('input_text').value;
@@ -878,7 +895,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('draft_box').innerText = draftPrefix + t.draft_reply;
             } catch (err) {
                 errBox.style.display = 'block';
-                errBox.innerText = '⚠️ ' + (err.name === 'AbortError' ? 'Request timed out after 15s. Please retry.' : err.message);
+                errBox.innerText = '⚠️ ' + (err.name === 'AbortError' ? '请求超过 18 秒超时，请稍后重试。' : err.message);
                 resBox.style.display = 'none';
             } finally {
                 clearTimeout(timeoutId);
