@@ -14,24 +14,28 @@ log.setLevel(logging.ERROR)
 
 API_HOST = "generativelanguage.googleapis.com"
 
-# 服务端二次兜底脱敏（主要脱敏已在浏览器端内存完成，此处为纵深防御）
 def server_fallback_redact(text: str) -> dict:
     redacted = text
+    # 邮箱
     redacted = re.sub(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', '[REDACTED_EMAIL]', redacted)
+    # 电话
     redacted = re.sub(r'(\+?\d{1,3}[-\s]?)?\(?\d{3}\)?[-\s]?\d{3,4}[-\s]?\d{4}', '[REDACTED_PHONE]', redacted)
+    # 合同编号
     redacted = re.sub(r'\b([A-Z]{2,5}-\d{2,6}|\#[A-Za-z0-9]{4,10})\b', '[REDACTED_ID]', redacted)
+    # 金额与百分比（保护“60秒、15分钟、45天”等时间单位不被误伤）
     redacted = re.sub(
-        r'(\$?\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|亿|美金|美元|元|块|k|m|b|million|billion|%)?)',
+        r'([\$¥￥€£]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:万美金|万美元|万港币|万元|万|亿|million|billion|k|m|b))?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万美金|万美元|万港币|万元|万|亿|美金|美元|港币|元|块|million|billion|k|m|b|%))',
         '[REDACTED_VALUE]',
         redacted,
         flags=re.IGNORECASE
     )
+    # 公司与资本实体
     redacted = re.sub(
         r'([A-Za-z0-9\u4e00-\u9fa5]{2,16}(?:公司|集团|科技|资本|银行|厂|Inc\.?|Corp\.?|LLC|Ltd\.?|Ventures|Capital))',
         '[COMPANY_ENTITY]',
         redacted
     )
-    count = len(re.findall(r'\[(?:REDACTED_\w+\vert{}COMPANY_ENTITY)\]', redacted))
+    count = len(re.findall(r'\[(?:REDACTED_\w+|COMPANY_ENTITY)\]', redacted))
     return {"sanitized_text": redacted, "redaction_count": count}
 
 def discover_available_flash_model(api_key: str) -> str:
@@ -100,6 +104,7 @@ def analyze_negotiation():
     user_goal = payload.get("user_goal", "").strip()
     hard_bottom_line = payload.get("hard_bottom_line", "").strip()
     risk_preference = payload.get("risk_preference", "").strip()
+    session_context = payload.get("session_context") or {}
 
     if not incoming_text:
         return jsonify({"error": "Please enter negotiation input or select a preset case."}), 400
@@ -111,69 +116,87 @@ def analyze_negotiation():
     if not api_key:
         return jsonify({"error": "GEMINI_API_KEY is not configured in Vercel environment."}), 500
 
+    if lang_pref == "zh":
+        lang_rule = """【语言纯度绝对铁律 (CRITICAL LANGUAGE PURITY)】:
+当前交互环境为纯中文。你输出的 JSON 中，除 'risk_level' 必须保留英文枚举字符串 ("SAFE", "LOW", "MEDIUM", "CRITICAL") 供前端样式绑定外，其余所有字段值（'trap_or_intent', 'triggered_rule', 'box1_text', 'box2_text', 'box3_text', 'counter_question', 'draft_reply'）必须 100% 使用流利、专业、地道的简体中文！
+严禁混杂任何英文段落或术语！例如：
+- 严禁输出 "Verbal Slippage Detected — Conditional Walk-Back Required"，必须输出 "监测到现场口头妥协漏洞 — 需强制附加条件纠偏"；
+- 严禁输出 "Breached Hard Bottom Lines: ... "，必须输出 "突破绝对底线：降价幅度超标或账期受损..."；
+- 严禁输出 "Quid Pro Quo"，必须输出 "对等交换原则"；
+- 严禁输出 "Cheap Talk"，必须输出 "廉价口头承诺/无成本画饼"。"""
+    else:
+        lang_rule = """【LANGUAGE PURITY RULE】:
+The UI language is English. ALL values in your JSON output MUST be in fluent, executive-level American English without any Chinese characters."""
+
     phase_instructions = {
         "pre_deal": """CURRENT STAGE: PHASE 1 — T-15m PRE-DEAL BRIEFING & WARGAMING (战前15分钟沙盘预警).
 Objective: 70% of negotiations are won before speaking. Arm the user psychologically and game-theoretically before entering the room.
-- In 'trap_or_intent': Identify the most likely Game-Theoretic Playbook the opponent will use (e.g., Ultimatum Game / Artificial Scarcity / Cheap Talk Future Bait).
+- In 'trap_or_intent': Identify the most likely Game-Theoretic Playbook the opponent will use (e.g. Ultimatum Game / Artificial Urgency / Cheap Talk Future Bait).
 - In 'triggered_rule': Cite the exact reservation value (BATNA / Hard Bottom Line) most at risk today and lock it.
-- In 'box1_text': [Opening Anchor & Framing]: What proactive anchor or agenda frame the user should set in the first 2 minutes.
-- In 'box2_text': [Predicted Traps & Signaling Test]: Specific opponent traps to anticipate and how to test if their promises are 'Cheap Talk' vs. 'Costly Signals'.
-- In 'box3_text': [Behavioral Circuit Breaker]: A concrete physical/verbal pause tactic tailored to the user's vulnerability (e.g., if pressured on deadline, pause 5s and cite Friday legal review).
-- In 'counter_question': [T-15m SMS Wake-Up Alert]: Ultra-punchy 1-sentence SMS alert sent to user's phone 15 mins before the meeting.
-- In 'draft_reply': [Pre-Meeting Framing Note / Agenda Opener]: A crisp message or opening statement to set the frame before sitting down.""",
+- In 'box1_text': [Opening Anchor & Framing]: Proactive agenda frame or opening anchor the user should set in the first 2 minutes.
+- In 'box2_text': [Predicted Traps & Signaling Test]: Specific traps to anticipate and how to test whether opponent claims are 'Cheap Talk' vs. 'Costly Signals'.
+- In 'box3_text': [Behavioral Circuit Breaker]: Concrete pause/delay tactic tailored to user's vulnerability.
+- In 'counter_question': [T-15m SMS Wake-Up Alert]: Ultra-punchy 1-sentence SMS alert sent to user's phone 15 mins before entering.
+- In 'draft_reply': [Pre-Meeting Agenda Opener]: Crisp opening statement to establish leverage before sitting down.""",
 
         "in_deal": """CURRENT STAGE: PHASE 2 — IN-DEAL STEALTH INTERVENTION (战中无痕交锋与三元拆解).
-Objective: The user is inside a live negotiation (either feeding a stealth 3-word shorthand under the table or live browser speech). Eliminate cognitive panic without illegal full-room audio recording.
-- Apply Nash Bargaining (Reservation Price defense), Cheap Talk filtering, and Epistemic Game Theory.
-- NO FALSE POSITIVES: If the counterparty agrees to terms or aligns constructively, set 'risk_level' to 'SAFE' and 'trap_or_intent' to 'Constructive Alignment'.
+Objective: The user is inside live negotiations. Apply Nash Bargaining, Cheap Talk filtering, and Epistemic Game Theory without illegal audio recording.
+- NO FALSE POSITIVES: If counterparty agrees to terms, set 'risk_level' to 'SAFE' and 'trap_or_intent' to 'Constructive Alignment' (良性推进).
 - In 'triggered_rule': Cite which exact Goal, Budget, or Hard Bottom Line was triggered or satisfied.
-- In 'box1_text': [Verified Facts]: Objective terms or constraints explicitly stated (zero speculation).
-- In 'box2_text': [Strategic Inferences]: Opponent's hidden leverage play, asymmetric information motive, or Cheap Talk bluff.
-- In 'box3_text': [Unknowns to Probe]: Missing variables required to test their bluff or verify budget.
+- In 'box1_text': [Verified Facts]: Objective terms explicitly stated (zero speculation).
+- In 'box2_text': [Strategic Inferences]: Opponent's hidden leverage play, information asymmetry, or Cheap Talk bluff.
+- In 'box3_text': [Unknowns to Probe]: Critical missing variables required to test their bluff or verify constraints.
 - In 'counter_question': [Live Counter-Question (<25 words)]: Sharp, non-defensive question to say out loud right now to flip leverage.
-- In 'draft_reply': [Tactical Reply / Stealth SMS Whisper]: Complete, poised response ready to send or speak.""",
+- In 'draft_reply': [Tactical Reply / Stealth Whisper]: Complete, poised response ready to speak or text.""",
 
         "post_deal": """CURRENT STAGE: PHASE 3 — T+0m POST-DEAL 60s VOICE DEBRIEF & FOLLOW-UP (战后60秒口述复盘与跟进闭环).
-Objective: The user just walked out of the room and dictated a 60-second voice summary. Audit the outcome against pre-deal bottom lines and lock in terms via a high-leverage follow-up email.
-- If all bottom lines were defended, set 'risk_level' to 'SAFE'. If the user made an unconditioned verbal concession that breached or neared a bottom line, set 'risk_level' to 'MEDIUM' or 'CRITICAL'.
-- In 'trap_or_intent': [Post-Deal Audit Verdict]: e.g., 'Verbal Slippage Detected — Conditional Walk-Back Required' or 'Strong Defense — Lock In Alignment'.
-- In 'triggered_rule': Compare what happened in the room against the user's initial Hard Bottom Lines & Goal.
+Objective: The user dictated a 60s summary right after the meeting. Cross-examine what actually happened against the pre-deal bottom lines and any pre-wargame predictions in session context!
+- If all bottom lines were held, set 'risk_level' to 'SAFE'. If the user made an unconditioned verbal concession that breached or neared a bottom line, set 'risk_level' to 'MEDIUM' or 'CRITICAL'.
+- In 'trap_or_intent': Audit verdict (e.g. '监测到口头妥协漏洞 — 需强制附加条件纠偏' or 'Verbal Slippage Detected — Conditional Walk-Back Required').
+- In 'triggered_rule': Specific bottom line or goal that was defended or breached.
 - In 'box1_text': [Defended Ground]: Key terms and bottom lines successfully protected during the meeting.
-- In 'box2_text': [Slippage & Risk Exposure]: Any verbal compromises, unverified opponent promises (Cheap Talk), or ambiguity that must be fenced in.
-- In 'box3_text': [Quid Pro Quo Lock]: What concrete condition or reciprocal commitment must be attached to any concession made.
+- In 'box2_text': [Slippage & Risk Exposure]: Verbal compromises or unverified opponent promises that must be fenced in.
+- In 'box3_text': [Quid Pro Quo Conditioning]: Concrete reciprocal condition that must be attached to any concession made.
 - In 'counter_question': [Core Debrief Takeaway]: 1-sentence strategic priority for the next 24 hours.
-- In 'draft_reply': [High-Leverage Follow-Up Email]: A masterfully written post-meeting email that politely summarizes agreed points while legally/commercially conditioning any verbal concessions (reclaiming leverage)."""
+- In 'draft_reply': [High-Leverage Follow-Up Email]: A masterfully written email that politely summarizes agreed points while conditioning any verbal concessions on strict reciprocal terms."""
     }
 
     selected_phase_prompt = phase_instructions.get(phase, phase_instructions["in_deal"])
 
-    system_instruction = f"""You are Consigliere AI (v4.0), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
+    # 注入全周期会话上下文记忆
+    session_history_str = ""
+    if phase == "post_deal" and session_context:
+        if session_context.get("pre_deal"):
+            session_history_str += f"\n[STAGE 1 WARGAME HISTORY (Prior Context)]: {json.dumps(session_context['pre_deal'], ensure_ascii=False)}"
+        if session_context.get("in_deal"):
+            session_history_str += f"\n[STAGE 2 IN-DEAL HISTORY (Live Context)]: {json.dumps(session_context['in_deal'], ensure_ascii=False)}"
+
+    system_instruction = f"""You are Consigliere AI (v4.1), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
 You replace illegal/intrusive full-room audio recording with a 3-stage cognitive defense architecture.
 
 USER STRATEGIC PROFILE (MEMORY BANK):
 - [Core Goal & Budget]: {user_goal}
-- [Hard Bottom Lines (Reservation Values)]: {hard_bottom_line}
+- [Hard Bottom Lines (Reservation Values / BATNA)]: {hard_bottom_line}
 - [Behavioral Vulnerabilities & Risk Profile]: {risk_preference}
 - [Input Channel]: {mode}
 
 {selected_phase_prompt}
 
-LANGUAGE RULE:
-If UI language preference ('{lang_pref}') is 'en', ALL JSON values MUST be in fluent, sharp, executive American English. If 'zh', output in concise, professional Chinese.
+{lang_rule}
 
-Output ONLY a single valid JSON object with these exact 8 keys (no Markdown wrappers):
+Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code block wrappers):
 {{
   "risk_level": "SAFE, LOW, MEDIUM, or CRITICAL",
-  "trap_or_intent": "Game-theoretic classification or audit verdict",
+  "trap_or_intent": "Classification or audit verdict",
   "triggered_rule": "Explicit reference to user's Goal, Bottom Line, or Vulnerability",
-  "box1_text": "Content for Pillar 1 based on current stage",
-  "box2_text": "Content for Pillar 2 based on current stage",
-  "box3_text": "Content for Pillar 3 based on current stage",
-  "counter_question": "Immediate counter-question, SMS wake-up alert, or core debrief takeaway (<25 words)",
+  "box1_text": "Pillar 1 Content",
+  "box2_text": "Pillar 2 Content",
+  "box3_text": "Pillar 3 Content",
+  "counter_question": "Immediate counter-question or SMS wake-up alert (<25 words)",
   "draft_reply": "Complete follow-up email, tactical reply draft, or pre-meeting framing note"
 }}"""
 
-    user_prompt = f"[{phase.upper()} INPUT (Sanitized)]: {sanitized_text}"
+    user_prompt = f"[{phase.upper()} INPUT (Sanitized)]: {sanitized_text}{session_history_str}"
 
     primary_model = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview").strip()
     candidate_models = [primary_model, "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
@@ -238,7 +261,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v4.0 — Full-Cycle Game-Theoretic Chief of Staff</title>
+    <title>Consigliere AI v4.1 — Full-Cycle Game-Theoretic Chief of Staff</title>
     <style>
         body { background: #090a0f; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; padding: 20px; max-width: 880px; margin: auto; line-height: 1.5; }
         .badge { background: #1e293b; color: #38bdf8; padding: 3px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #0284c7; }
@@ -258,6 +281,11 @@ HTML_UI = r"""<!DOCTYPE html>
         .phase-tab.active { background: #1e293b; border: 1.5px solid #38bdf8; color: #fff; box-shadow: 0 0 12px rgba(56, 189, 248, 0.15); }
         .phase-tab-title { font-weight: bold; font-size: 13px; color: #38bdf8; display: block; }
         .phase-tab-desc { font-size: 11px; color: #94a3b8; margin-top: 2px; display: block; }
+        .session-bar { display: flex; justify-content: space-between; align-items: center; background: #18181b; border: 1px solid #27272a; padding: 8px 12px; border-radius: 6px; font-size: 12px; color: #94a3b8; margin-top: 10px; flex-wrap: wrap; gap: 8px; }
+        .session-status { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .session-dot { font-weight: bold; }
+        .btn-reset { background: #27272a; border: 1px solid #3f3f46; color: #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; width: auto; margin-top: 0; }
+        .btn-reset:hover { background: #3f3f46; color: #fff; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .preset-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
         .preset-btn { background: #1e293b; border: 1px solid #334155; color: #cbd5e1; padding: 6px 10px; font-size: 12px; width: auto; cursor: pointer; border-radius: 4px; }
@@ -268,7 +296,11 @@ HTML_UI = r"""<!DOCTYPE html>
         .tri-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }
         .tri-box { background: #18181b; border: 1px solid #27272a; padding: 10px; border-radius: 6px; font-size: 12px; }
         .tri-title { color: #38bdf8; font-weight: bold; margin-bottom: 4px; font-size: 12px; }
-        .counter { font-size: 16px; color: #facc15; font-weight: bold; margin: 12px 0 8px 0; }
+        .counter-row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 8px 0; flex-wrap: wrap; gap: 8px; }
+        .counter { font-size: 15px; color: #facc15; font-weight: bold; }
+        .action-btns { display: flex; gap: 8px; margin-top: 8px; }
+        .action-btn { background: #1e293b; border: 1px solid #3b82f6; color: #60a5fa; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; width: auto; font-weight: 600; margin-top: 0; }
+        .action-btn:hover { background: #2563eb; color: #fff; }
         .meta { font-size: 12px; color: #10b981; background: #064e3b33; padding: 10px; border-radius: 6px; border: 1px solid #05966955; word-break: break-all; }
         table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
         th, td { border: 1px solid #27272a; padding: 8px; text-align: left; }
@@ -279,7 +311,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <body>
     <div class="header-row">
         <div>
-            <h2 style="margin:0 0 4px 0;">⚡ Consigliere AI <span class="badge">v4.0 — Full-Cycle Game-Theoretic Chief of Staff</span></h2>
+            <h2 style="margin:0 0 4px 0;">⚡ Consigliere AI <span class="badge">v4.1 — Full-Cycle Chief of Staff</span></h2>
             <span style="color:#94a3b8; font-size:13px;" id="subtitle_text">Solving the Recording Dilemma: 70% Pre-Deal Wargaming • 20% Stealth In-Deal • 10% Post-Deal Debrief</span>
         </div>
         <div class="lang-switch">
@@ -321,6 +353,17 @@ HTML_UI = r"""<!DOCTYPE html>
                 <span class="phase-tab-title" id="tab3_t">🎙️ Stage 3: T+0m Debrief</span>
                 <span class="phase-tab-desc" id="tab3_d">60s Voice Audit vs. Bottom Lines & Follow-Up Email</span>
             </button>
+        </div>
+
+        <!-- 全周期状态流转指示器 -->
+        <div class="session-bar">
+            <div class="session-status">
+                <span id="session_label">🔗 Session Chain:</span>
+                <span id="dot_p1" class="session-dot" style="color:#64748b;">⚪ T-15m Wargame</span>
+                <span id="dot_p2" class="session-dot" style="color:#64748b;">⚪ Live Stealth</span>
+                <span id="dot_p3" class="session-dot" style="color:#64748b;">⚪ Post-Debrief</span>
+            </div>
+            <button type="button" class="btn-reset" onclick="resetSessionChain()" id="btn_reset_session">🔄 Reset Session Memory</button>
         </div>
 
         <div class="preset-row" id="preset_container"></div>
@@ -368,16 +411,26 @@ HTML_UI = r"""<!DOCTYPE html>
             </div>
         </div>
 
-        <div class="counter" id="counter_q"></div>
+        <div class="counter-row">
+            <div class="counter" id="counter_q"></div>
+            <button type="button" class="action-btn" onclick="copyCounterQuestion()" id="btn_copy_q">📋 Copy Alert</button>
+        </div>
+
         <div style="background:#18181b; border:1px solid #3f3f46; padding:12px; border-radius:6px; font-size:13px; white-space:pre-wrap;" id="draft_box"></div>
+
+        <div class="action-btns">
+            <button type="button" class="action-btn" onclick="copyDraftReply()" id="btn_copy_draft">📋 Copy Full Draft / Email</button>
+            <button type="button" class="action-btn" onclick="openMailClient()" id="btn_mail_client">✉️ Open in Mail Client</button>
+            <span id="copy_toast" style="color:#10b981; font-size:12px; align-self:center; display:none;">✅ Copied to clipboard!</span>
+        </div>
     </div>
 
     <!-- 4. 博弈论内核、隐私边界与工程迭代证据 -->
     <div class="card">
         <strong id="sec3_title">🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log</strong>
         <p style="font-size:12px; color:#94a3b8; margin:6px 0;" id="privacy_desc">
-            • <strong>Why Full-Cycle Beats Eavesdropping:</strong> Recording live boardroom audio violates two-party consent laws and destroys trust. By anchoring <strong>Stage 1 (T-15m Wargaming)</strong>, <strong>Stage 2 (3-Word Stealth Shorthand)</strong>, and <strong>Stage 3 (60s Post-Deal Voice Debrief)</strong>, Consigliere AI delivers 100% tactical coverage with zero illegal recording.<br>
-            • <strong>Verifiable Client-Side Scrubbing:</strong> Open DevTools (<code>F12 -> Network</code>) to verify that emails, phone numbers, contract IDs, and dollar amounts are replaced with <code>[REDACTED_*]</code> in browser JS before any packet leaves your device.
+            • <strong>Why Full-Cycle Beats Eavesdropping:</strong> Recording boardroom audio violates consent laws and creates hostility. By chaining <strong>Stage 1 (T-15m Wargame)</strong>, <strong>Stage 2 (3-Word Stealth Shorthand)</strong>, and <strong>Stage 3 (60s Post-Deal Voice Debrief)</strong> in local memory, Consigliere AI delivers end-to-end tactical defense with zero continuous audio recording.<br>
+            • <strong>Verifiable Client-Side Scrubbing:</strong> Open DevTools (<code>F12 -> Network</code>) to verify that emails, phone numbers, and dollar amounts are sanitized in browser JS before network transmission. Time expressions like "60s" or "45 days" are strictly preserved.
         </p>
         <table>
             <thead>
@@ -395,13 +448,13 @@ HTML_UI = r"""<!DOCTYPE html>
                 </tr>
                 <tr>
                     <td><strong>v2.0 → v3.2</strong></td>
-                    <td>Single-sentence output mixed up stated facts with AI speculation; lacked bilingual support.</td>
-                    <td>Enforced Epistemic Game Theory split (Facts / Inferences / Unknowns), client-side regex scrubbing, and EN/ZH auto-adaptation.</td>
+                    <td>Single-sentence output mixed up stated facts with AI speculation; regex accidentally redacted "60s".</td>
+                    <td>Enforced Epistemic Game Theory split (Facts / Inferences / Unknowns), refined regex to protect time units, and added EN/ZH auto-adaptation.</td>
                 </tr>
                 <tr>
-                    <td><strong>v3.2 → v4.0</strong></td>
-                    <td>Relying only on live transcripts missed pre-meeting preparation and post-meeting verbal slippage recovery.</td>
-                    <td>Built the <strong>3-Stage Full-Cycle Defense</strong> (T-15m SMS Wargaming + Live 3-Word Shorthand + T+0m 60s Debrief & Conditional Follow-Up Email).</td>
+                    <td><strong>v3.2 → v4.1</strong></td>
+                    <td>Stages were isolated without memory chaining; Chinese UI leaked English phrases in headers and verdicts.</td>
+                    <td>Built <strong>Local Session Chaining</strong> across all 3 stages, enforced 100% language purity in Chinese mode, and added one-click copy/mailto triggers.</td>
                 </tr>
             </tbody>
         </table>
@@ -410,6 +463,14 @@ HTML_UI = r"""<!DOCTYPE html>
     <script>
         let currentLang = 'en';
         let currentPhase = 'in_deal';
+        let latestTacticalOutput = null;
+
+        // 全周期本地会话链路内存
+        let sessionMemory = {
+            pre_deal: null,
+            in_deal: null,
+            post_deal: null
+        };
 
         const PROFILES = {
             en: {
@@ -489,6 +550,32 @@ HTML_UI = r"""<!DOCTYPE html>
             document.getElementById('t_box3').innerText = titles[2];
         }
 
+        function updateSessionUI() {
+            const p1Color = sessionMemory.pre_deal ? '#10b981' : '#64748b';
+            const p2Color = sessionMemory.in_deal ? '#10b981' : '#64748b';
+            const p3Color = sessionMemory.post_deal ? '#10b981' : '#64748b';
+
+            if (currentLang === 'zh') {
+                document.getElementById('session_label').innerText = '🔗 全周期会话链路：';
+                document.getElementById('dot_p1').innerHTML = `<span style="color:${p1Color}">${sessionMemory.pre_deal ? '🟢' : '⚪'} 战前沙盘预案${sessionMemory.pre_deal ? '（已建立）' : ''}</span>`;
+                document.getElementById('dot_p2').innerHTML = `<span style="color:${p2Color}">${sessionMemory.in_deal ? '🟢' : '⚪'} 战中干预记录${sessionMemory.in_deal ? '（已同步）' : ''}</span>`;
+                document.getElementById('dot_p3').innerHTML = `<span style="color:${p3Color}">${sessionMemory.post_deal ? '🟢' : '⚪'} 战后复盘闭环${sessionMemory.post_deal ? '（已对账）' : ''}</span>`;
+                document.getElementById('btn_reset_session').innerText = '🔄 重置会话链路';
+            } else {
+                document.getElementById('session_label').innerText = '🔗 Session Memory Chain:';
+                document.getElementById('dot_p1').innerHTML = `<span style="color:${p1Color}">${sessionMemory.pre_deal ? '🟢' : '⚪'} T-15m Wargame${sessionMemory.pre_deal ? ' [Ready]' : ''}</span>`;
+                document.getElementById('dot_p2').innerHTML = `<span style="color:${p2Color}">${sessionMemory.in_deal ? '🟢' : '⚪'} Live Stealth${sessionMemory.in_deal ? ' [Logged]' : ''}</span>`;
+                document.getElementById('dot_p3').innerHTML = `<span style="color:${p3Color}">${sessionMemory.post_deal ? '🟢' : '⚪'} Post-Debrief${sessionMemory.post_deal ? ' [Closed]' : ''}</span>`;
+                document.getElementById('btn_reset_session').innerText = '🔄 Reset Session Memory';
+            }
+        }
+
+        function resetSessionChain() {
+            sessionMemory = { pre_deal: null, in_deal: null, post_deal: null };
+            updateSessionUI();
+            alert(currentLang === 'zh' ? '会话链路记忆已清空重置。' : 'Session memory chain has been reset.');
+        }
+
         function setLanguage(lang) {
             currentLang = lang;
             document.getElementById('btn_en').className = 'lang-btn' + (lang === 'en' ? ' active' : '');
@@ -518,6 +605,9 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('lbl_input_text').innerText = "当前阶段输入（战前对手背景 / 战中3词暗号或原话 / 战后60秒语音口述）：";
                 document.getElementById('mic_btn').innerText = "🎤 开启本地语音口述";
                 document.getElementById('run_btn').innerText = "⚡ 启动全周期博弈推演";
+                document.getElementById('btn_copy_q').innerText = "📋 复制破局反问/短信";
+                document.getElementById('btn_copy_draft').innerText = "📋 复制全文/跟进邮件";
+                document.getElementById('btn_mail_client').innerText = "✉️ 唤起本地邮件客户端";
             } else {
                 document.getElementById('subtitle_text').innerText = "Solving the Recording Dilemma: 70% Pre-Deal Wargaming • 20% Stealth In-Deal • 10% Post-Deal Debrief";
                 document.getElementById('sec1_title').innerText = "📂 1. Chief of Staff Memory Bank (Reservation Values, Calendar Context & Vulnerabilities)";
@@ -537,9 +627,13 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('lbl_input_text').innerText = "Stage Input (Meeting Context / Live 3-Word Shorthand / 60s Post-Deal Voice Memo):";
                 document.getElementById('mic_btn').innerText = "🎤 Dictate via Local Browser Speech";
                 document.getElementById('run_btn').innerText = "⚡ Execute Game-Theoretic Engine";
+                document.getElementById('btn_copy_q').innerText = "📋 Copy Alert";
+                document.getElementById('btn_copy_draft').innerText = "📋 Copy Full Draft / Email";
+                document.getElementById('btn_mail_client').innerText = "✉️ Open in Mail Client";
             }
 
             updatePillarHeaders();
+            updateSessionUI();
             renderPresets();
             const firstKey = Object.keys(STAGE_PRESETS[currentLang][currentPhase])[0];
             loadPreset(firstKey);
@@ -575,12 +669,13 @@ HTML_UI = r"""<!DOCTYPE html>
             if (val) document.getElementById('input_text').value = val;
         }
 
+        // 精准脱敏引擎：保护“60秒、15分钟、45天、30天”等时间词，精准脱敏财务金额与百分比
         function clientSideRedact(rawText) {
             let redacted = rawText;
             redacted = redacted.replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/g, '[REDACTED_EMAIL]');
             redacted = redacted.replace(/(\+?\d{1,3}[-\s]?)?\(?\d{3}\)?[-\s]?\d{3,4}[-\s]?\d{4}/g, '[REDACTED_PHONE]');
             redacted = redacted.replace(/\b([A-Z]{2,5}-\d{2,6}|\#[A-Za-z0-9]{4,10})\b/g, '[REDACTED_ID]');
-            redacted = redacted.replace(/(\$?\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|亿|美金|美元|元|块|k|m|b|million|billion|%)?)/gi, '[REDACTED_VALUE]');
+            redacted = redacted.replace(/([\$¥￥€£]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:万美金|万美元|万港币|万元|万|亿|million|billion|k|m|b))?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万美金|万美元|万港币|万元|万|亿|美金|美元|港币|元|块|million|billion|k|m|b|%))/gi, '[REDACTED_VALUE]');
             redacted = redacted.replace(/([A-Za-z0-9\u4e00-\u9fa5]{2,16}(?:公司|集团|科技|资本|银行|厂|Inc\.?|Corp\.?|LLC|Ltd\.?|Ventures|Capital))/g, '[COMPANY_ENTITY]');
             const matches = redacted.match(/\[(?:REDACTED_\w+|COMPANY_ENTITY)\]/g);
             return {
@@ -650,7 +745,8 @@ HTML_UI = r"""<!DOCTYPE html>
                     text: clientScrubbedText,
                     user_goal: document.getElementById('user_goal').value,
                     hard_bottom_line: document.getElementById('hard_bottom_line').value,
-                    risk_preference: document.getElementById('risk_preference').value
+                    risk_preference: document.getElementById('risk_preference').value,
+                    session_context: sessionMemory
                 };
 
                 const res = await fetch('/analyze', {
@@ -673,20 +769,37 @@ HTML_UI = r"""<!DOCTYPE html>
                 }
 
                 const t = data.tactical_advice;
+                latestTacticalOutput = t;
+                sessionMemory[currentPhase] = {
+                    trap: t.trap_or_intent,
+                    rule: t.triggered_rule,
+                    advice: t.counter_question,
+                    draft: t.draft_reply
+                };
+                updateSessionUI();
+
                 resBox.className = 'card risk-' + (t.risk_level || 'MEDIUM');
                 resBox.style.display = 'block';
                 updatePillarHeaders();
 
                 const auditMsg = currentLang === 'zh'
-                    ? `🛡️ <strong>客户端本地预脱敏验证：</strong>已在浏览器本地拦截替换 <b>${localRedactedCount}</b> 处敏感实体（原始敏感词未离设备） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际发往云端模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
+                    ? `🛡️ <strong>客户端本地预脱敏验证：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（原始敏感词未出设备） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际离开浏览器并发往模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
                     : `🛡️ <strong>Client-Side Sanitization Verified:</strong> <b>${localRedactedCount}</b> sensitive entities scrubbed in browser memory prior to network call | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Actual Sanitized Payload Sent:</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
 
                 document.getElementById('audit_view').innerHTML = auditMsg;
 
-                const badgeColor = t.risk_level === 'SAFE' ? '#10b981' : (t.risk_level === 'LOW' ? '#f59e0b' : '#f87171');
+                const badgeColor = t.risk_level === 'SAFE' ? '#10b981' : (t.risk_level === 'LOW' ? '#f59e0b' : '#ef4444');
+                const riskMapZh = {
+                    'CRITICAL': '【严重预警 · 突破底线】',
+                    'MEDIUM': '【中度博弈 · 存在诱导】',
+                    'LOW': '【轻微试探 · 局部拉锯】',
+                    'SAFE': '【安全对齐 · 推进协议】'
+                };
+                const riskBadgeText = currentLang === 'zh' ? (riskMapZh[t.risk_level] || t.risk_level) : `[${t.risk_level}]`;
+                
                 document.getElementById('trap_title').style.color = badgeColor;
-                document.getElementById('trap_title').innerText = `[${t.risk_level}] ${t.trap_or_intent}`;
-                document.getElementById('rule_cited').innerText = (currentLang === 'zh' ? '⚖️ 关联规则与底线锚定：' : '⚖️ Grounded Rule & BATNA Audit: ') + t.triggered_rule;
+                document.getElementById('trap_title').innerText = `${riskBadgeText} ${t.trap_or_intent}`;
+                document.getElementById('rule_cited').innerText = (currentLang === 'zh' ? '⚖️ 关联底线与原则锚定：' : '⚖️ Grounded Rule & BATNA: ') + t.triggered_rule;
 
                 document.getElementById('facts_box').innerText = t.box1_text;
                 document.getElementById('inference_box').innerText = t.box2_text;
@@ -716,6 +829,35 @@ HTML_UI = r"""<!DOCTYPE html>
                 runBtn.disabled = false;
                 runBtn.innerText = currentLang === 'zh' ? '⚡ 启动全周期博弈推演' : '⚡ Execute Game-Theoretic Engine';
             }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('copy_toast');
+            toast.innerText = msg;
+            toast.style.display = 'inline';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+
+        function copyCounterQuestion() {
+            if (!latestTacticalOutput || !latestTacticalOutput.counter_question) return;
+            navigator.clipboard.writeText(latestTacticalOutput.counter_question).then(() => {
+                showToast(currentLang === 'zh' ? '✅ 破局反问/短信已复制！' : '✅ Alert copied!');
+            });
+        }
+
+        function copyDraftReply() {
+            if (!latestTacticalOutput || !latestTacticalOutput.draft_reply) return;
+            navigator.clipboard.writeText(latestTacticalOutput.draft_reply).then(() => {
+                showToast(currentLang === 'zh' ? '✅ 跟进邮件/全文草稿已复制！' : '✅ Draft copied to clipboard!');
+            });
+        }
+
+        function openMailClient() {
+            if (!latestTacticalOutput || !latestTacticalOutput.draft_reply) return;
+            const subject = currentLang === 'zh' ? '商务洽谈要点复盘与后续流程确认' : 'Executive Summary & Agreed Next Steps';
+            const body = latestTacticalOutput.draft_reply;
+            const mailtoUrl = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+            window.location.href = mailtoUrl;
         }
 
         window.addEventListener('DOMContentLoaded', () => {
