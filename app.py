@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# 关闭 Werkzeug 默认请求体日志，防止服务端记录任何请求内容
+# 关闭 Werkzeug 默认请求体日志，防止服务端记录任何敏感内容
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
@@ -16,20 +16,20 @@ API_HOST = "generativelanguage.googleapis.com"
 
 def server_fallback_redact(text: str) -> dict:
     redacted = text
-    # 邮箱
+    # 邮箱脱敏
     redacted = re.sub(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', '[REDACTED_EMAIL]', redacted)
-    # 电话
+    # 电话脱敏
     redacted = re.sub(r'(\+?\d{1,3}[-\s]?)?\(?\d{3}\)?[-\s]?\d{3,4}[-\s]?\d{4}', '[REDACTED_PHONE]', redacted)
-    # 合同编号
+    # 合同编号 / ID
     redacted = re.sub(r'\b([A-Z]{2,5}-\d{2,6}|\#[A-Za-z0-9]{4,10})\b', '[REDACTED_ID]', redacted)
-    # 金额与百分比（保护“60秒、15分钟、45天”等时间单位不被误伤）
+    # 金额与百分比（保护“60秒、15分钟、45天、30天”等纯时间词不被误伤）
     redacted = re.sub(
         r'([\$¥￥€£]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:万美金|万美元|万港币|万元|万|亿|million|billion|k|m|b))?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万美金|万美元|万港币|万元|万|亿|美金|美元|港币|元|块|million|billion|k|m|b|%))',
         '[REDACTED_VALUE]',
         redacted,
         flags=re.IGNORECASE
     )
-    # 公司与资本实体
+    # 公司与资本机构
     redacted = re.sub(
         r'([A-Za-z0-9\u4e00-\u9fa5]{2,16}(?:公司|集团|科技|资本|银行|厂|Inc\.?|Corp\.?|LLC|Ltd\.?|Ventures|Capital))',
         '[COMPANY_ENTITY]',
@@ -163,7 +163,6 @@ Objective: The user dictated a 60s summary right after the meeting. Cross-examin
 
     selected_phase_prompt = phase_instructions.get(phase, phase_instructions["in_deal"])
 
-    # 注入全周期会话上下文记忆
     session_history_str = ""
     if phase == "post_deal" and session_context:
         if session_context.get("pre_deal"):
@@ -375,8 +374,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 <option value="browser_stt" id="opt_mode_stt">🟢 Ephemeral Browser Web Speech STT + Client Scrubbing</option>
             </select>
             <select id="voice_lang">
-                <option value="en-US">🎙️ Microphone: English (US / Global)</option>
-                <option value="zh-CN">🎙️ Microphone: 中文 (Mandarin)</option>
+                <option value="en-US" id="opt_lang_en">🎙️ Microphone: English (US / Global)</option>
+                <option value="zh-CN" id="opt_lang_zh">🎙️ Microphone: 中文 (Mandarin)</option>
             </select>
         </div>
 
@@ -428,36 +427,8 @@ HTML_UI = r"""<!DOCTYPE html>
     <!-- 4. 博弈论内核、隐私边界与工程迭代证据 -->
     <div class="card">
         <strong id="sec3_title">🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log</strong>
-        <p style="font-size:12px; color:#94a3b8; margin:6px 0;" id="privacy_desc">
-            • <strong>Why Full-Cycle Beats Eavesdropping:</strong> Recording boardroom audio violates consent laws and creates hostility. By chaining <strong>Stage 1 (T-15m Wargame)</strong>, <strong>Stage 2 (3-Word Stealth Shorthand)</strong>, and <strong>Stage 3 (60s Post-Deal Voice Debrief)</strong> in local memory, Consigliere AI delivers end-to-end tactical defense with zero continuous audio recording.<br>
-            • <strong>Verifiable Client-Side Scrubbing:</strong> Open DevTools (<code>F12 -> Network</code>) to verify that emails, phone numbers, and dollar amounts are sanitized in browser JS before network transmission. Time expressions like "60s" or "45 days" are strictly preserved.
-        </p>
-        <table>
-            <thead>
-                <tr>
-                    <th>Iteration</th>
-                    <th>Failure Mode / Tester Feedback</th>
-                    <th>Engineering & Game-Theoretic Fix</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>v1.0 → v2.0</strong></td>
-                    <td>100% false-positive rate: flagged even benign agreement emails as hostile traps.</td>
-                    <td>Added <code>SAFE</code> baseline & Nash alignment check; verified zero false alarms on benign inputs.</td>
-                </tr>
-                <tr>
-                    <td><strong>v2.0 → v3.2</strong></td>
-                    <td>Single-sentence output mixed up stated facts with AI speculation; regex accidentally redacted "60s".</td>
-                    <td>Enforced Epistemic Game Theory split (Facts / Inferences / Unknowns), refined regex to protect time units, and added EN/ZH auto-adaptation.</td>
-                </tr>
-                <tr>
-                    <td><strong>v3.2 → v4.1</strong></td>
-                    <td>Stages were isolated without memory chaining; Chinese UI leaked English phrases in headers and verdicts.</td>
-                    <td>Built <strong>Local Session Chaining</strong> across all 3 stages, enforced 100% language purity in Chinese mode, and added one-click copy/mailto triggers.</td>
-                </tr>
-            </tbody>
-        </table>
+        <p style="font-size:12px; color:#94a3b8; margin:6px 0;" id="privacy_desc"></p>
+        <div id="iteration_table_container"></div>
     </div>
 
     <script>
@@ -465,7 +436,6 @@ HTML_UI = r"""<!DOCTYPE html>
         let currentPhase = 'in_deal';
         let latestTacticalOutput = null;
 
-        // 全周期本地会话链路内存
         let sessionMemory = {
             pre_deal: null,
             in_deal: null,
@@ -576,6 +546,69 @@ HTML_UI = r"""<!DOCTYPE html>
             alert(currentLang === 'zh' ? '会话链路记忆已清空重置。' : 'Session memory chain has been reset.');
         }
 
+        function renderIterationTable() {
+            const container = document.getElementById('iteration_table_container');
+            if (currentLang === 'zh') {
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>迭代版本</th>
+                                <th>发现的失效表现 / 测试者真实反馈</th>
+                                <th>博弈论与工程级重构举措</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>v1.0 → v2.0</strong></td>
+                                <td>误报率 100%：将常规友善的确认邮件也全量判定为高风险陷阱。</td>
+                                <td>引入 <code>SAFE</code> 基线与纳什合作检验机制，验证良性输入零误报。</td>
+                            </tr>
+                            <tr>
+                                <td><strong>v2.0 → v3.2</strong></td>
+                                <td>单句反问过于单薄，客观事实与推测混杂；正则误伤打码了“60秒”。</td>
+                                <td>强制执行认识论三元拆解（事实/推断/未知），修复正则保护时间词，加入中英自适应。</td>
+                            </tr>
+                            <tr>
+                                <td><strong>v3.2 → v4.1</strong></td>
+                                <td>孤立单次请求缺乏跨阶段记忆；中文界面残留英文标题与字段。</td>
+                                <td>构建<strong>全周期三阶段会话链路</strong>（战前沙盘+战中暗号+战后邮件），强制 100% 语言纯度并新增一键复制/邮件唤起。</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Iteration</th>
+                                <th>Failure Mode / Tester Feedback</th>
+                                <th>Engineering & Game-Theoretic Fix</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>v1.0 → v2.0</strong></td>
+                                <td>100% false-positive rate: flagged even benign agreement emails as hostile traps.</td>
+                                <td>Added <code>SAFE</code> baseline & Nash alignment check; verified zero false alarms on benign inputs.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>v2.0 → v3.2</strong></td>
+                                <td>Single-sentence output mixed up stated facts with AI speculation; regex accidentally redacted "60s".</td>
+                                <td>Enforced Epistemic Game Theory split (Facts / Inferences / Unknowns), refined regex to protect time units, and added EN/ZH auto-adaptation.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>v3.2 → v4.1</strong></td>
+                                <td>Stages were isolated without memory chaining; Chinese UI leaked English phrases in headers and verdicts.</td>
+                                <td>Built <strong>Local Session Chaining</strong> across all 3 stages, enforced 100% language purity in Chinese mode, and added one-click copy/mailto triggers.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+            }
+        }
+
         function setLanguage(lang) {
             currentLang = lang;
             document.getElementById('btn_en').className = 'lang-btn' + (lang === 'en' ? ' active' : '');
@@ -602,12 +635,20 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('lbl_mode').innerText = "交互通道与本地麦克风语言：";
                 document.getElementById('opt_mode_sms').innerText = "🔒 极简3词短信暗号 / 盲打触发（零现场录音暴露风险）";
                 document.getElementById('opt_mode_stt').innerText = "🟢 浏览器瞬态语音转写 + 客户端本地预脱敏";
+                document.getElementById('opt_lang_en').innerText = "🎙️ 麦克风语言：English (US / 国际)";
+                document.getElementById('opt_lang_zh').innerText = "🎙️ 麦克风语言：中文 (普通话)";
                 document.getElementById('lbl_input_text').innerText = "当前阶段输入（战前对手背景 / 战中3词暗号或原话 / 战后60秒语音口述）：";
                 document.getElementById('mic_btn').innerText = "🎤 开启本地语音口述";
                 document.getElementById('run_btn').innerText = "⚡ 启动全周期博弈推演";
                 document.getElementById('btn_copy_q').innerText = "📋 复制破局反问/短信";
                 document.getElementById('btn_copy_draft').innerText = "📋 复制全文/跟进邮件";
                 document.getElementById('btn_mail_client').innerText = "✉️ 唤起本地邮件客户端";
+
+                document.getElementById('sec3_title').innerText = "🔍 3. 博弈论架构、隐私验证与工程迭代记录";
+                document.getElementById('privacy_desc').innerHTML = `
+                    • <strong>为何全周期胜过现场录音：</strong>在董事会或商务谈判现场秘密录音不仅违反双向知情同意法，且严重破坏互信。Consigliere AI 通过<strong>阶段 1（战前 15 分钟沙盘）</strong>、<strong>阶段 2（桌面下 3 词暗号）</strong>与<strong>阶段 3（战后 60 秒口述复盘）</strong>串联，实现 100% 战术防御覆盖且零录音风险。<br>
+                    • <strong>可验证的前端脱敏：</strong>可按 <code>F12</code> 打开浏览器 <code>Network</code> 面板验证：邮箱、电话与合同号在<strong>离开浏览器前已被正则打码</strong>；同时精准保护“60秒、45天”等时间词不被误伤。
+                `;
             } else {
                 document.getElementById('subtitle_text').innerText = "Solving the Recording Dilemma: 70% Pre-Deal Wargaming • 20% Stealth In-Deal • 10% Post-Deal Debrief";
                 document.getElementById('sec1_title').innerText = "📂 1. Chief of Staff Memory Bank (Reservation Values, Calendar Context & Vulnerabilities)";
@@ -624,16 +665,25 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('lbl_mode').innerText = "Input Channel & Local Speech Recognition Language:";
                 document.getElementById('opt_mode_sms').innerText = "🔒 Stealth 3-Word Shorthand / SMS Trigger (Zero Audio Exposure)";
                 document.getElementById('opt_mode_stt').innerText = "🟢 Ephemeral Browser Web Speech STT + Client Scrubbing";
+                document.getElementById('opt_lang_en').innerText = "🎙️ Microphone: English (US / Global)";
+                document.getElementById('opt_lang_zh').innerText = "🎙️ Microphone: 中文 (Mandarin)";
                 document.getElementById('lbl_input_text').innerText = "Stage Input (Meeting Context / Live 3-Word Shorthand / 60s Post-Deal Voice Memo):";
                 document.getElementById('mic_btn').innerText = "🎤 Dictate via Local Browser Speech";
                 document.getElementById('run_btn').innerText = "⚡ Execute Game-Theoretic Engine";
                 document.getElementById('btn_copy_q').innerText = "📋 Copy Alert";
                 document.getElementById('btn_copy_draft').innerText = "📋 Copy Full Draft / Email";
                 document.getElementById('btn_mail_client').innerText = "✉️ Open in Mail Client";
+
+                document.getElementById('sec3_title').innerText = "🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log";
+                document.getElementById('privacy_desc').innerHTML = `
+                    • <strong>Why Full-Cycle Beats Eavesdropping:</strong> Recording boardroom audio violates consent laws and creates hostility. By chaining <strong>Stage 1 (T-15m Wargame)</strong>, <strong>Stage 2 (3-Word Stealth Shorthand)</strong>, and <strong>Stage 3 (60s Post-Deal Voice Debrief)</strong> in local memory, Consigliere AI delivers end-to-end tactical defense with zero continuous audio recording.<br>
+                    • <strong>Verifiable Client-Side Scrubbing:</strong> Open DevTools (<code>F12 -> Network</code>) to verify that emails, phone numbers, and dollar amounts are sanitized in browser JS before network transmission. Time expressions like "60s" or "45 days" are strictly preserved.
+                `;
             }
 
             updatePillarHeaders();
             updateSessionUI();
+            renderIterationTable();
             renderPresets();
             const firstKey = Object.keys(STAGE_PRESETS[currentLang][currentPhase])[0];
             loadPreset(firstKey);
@@ -669,7 +719,6 @@ HTML_UI = r"""<!DOCTYPE html>
             if (val) document.getElementById('input_text').value = val;
         }
 
-        // 精准脱敏引擎：保护“60秒、15分钟、45天、30天”等时间词，精准脱敏财务金额与百分比
         function clientSideRedact(rawText) {
             let redacted = rawText;
             redacted = redacted.replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/g, '[REDACTED_EMAIL]');
@@ -796,7 +845,7 @@ HTML_UI = r"""<!DOCTYPE html>
                     'SAFE': '【安全对齐 · 推进协议】'
                 };
                 const riskBadgeText = currentLang === 'zh' ? (riskMapZh[t.risk_level] || t.risk_level) : `[${t.risk_level}]`;
-                
+
                 document.getElementById('trap_title').style.color = badgeColor;
                 document.getElementById('trap_title').innerText = `${riskBadgeText} ${t.trap_or_intent}`;
                 document.getElementById('rule_cited').innerText = (currentLang === 'zh' ? '⚖️ 关联底线与原则锚定：' : '⚖️ Grounded Rule & BATNA: ') + t.triggered_rule;
