@@ -3,8 +3,7 @@ import re
 import time
 import json
 import logging
-import urllib.request
-import urllib.error
+import http.client
 from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
@@ -12,6 +11,8 @@ app = Flask(__name__)
 # 关闭 Werkzeug 默认的请求体日志，确保服务器端不记录敏感请求内容
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
+
+API_HOST = "generativelanguage.googleapis.com"
 
 # 二次服务端兜底脱敏（主要脱敏已在浏览器端完成，此处为 Defense-in-Depth 双重保险）
 def server_fallback_redact(text: str) -> dict:
@@ -34,11 +35,18 @@ def server_fallback_redact(text: str) -> dict:
     return {"sanitized_text": redacted, "redaction_count": count}
 
 def discover_available_flash_model(api_key: str) -> str:
-    """当默认模型名称变动时，自动向 Google API 查询当前账号可用的最新 Flash 模型"""
-    url = f"[https://generativelanguage.googleapis.com/v1beta/models?key=](https://generativelanguage.googleapis.com/v1beta/models?key=){api_key}"
-    req = urllib.request.Request(url, method="GET")
-    with urllib.request.urlopen(req, timeout=4) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+    """当预设模型名称变动时，自动向 Google 接口查询当前账号可用的最新 Flash 模型"""
+    conn = http.client.HTTPSConnection(API_HOST, timeout=5)
+    try:
+        conn.request("GET", f"/v1beta/models?key={api_key}")
+        resp = conn.getresponse()
+        raw = resp.read().decode("utf-8", errors="ignore")
+        if resp.status != 200:
+            raise RuntimeError(f"HTTP {resp.status}: {raw[:120]}")
+        data = json.loads(raw)
+    finally:
+        conn.close()
+
     models = data.get("models", [])
     flash_candidates = []
     for m in models:
@@ -47,13 +55,13 @@ def discover_available_flash_model(api_key: str) -> str:
         if "generateContent" in methods and "flash" in name.lower() and "2.0-flash" not in name.lower():
             flash_candidates.append(name)
     for preferred in flash_candidates:
-        if ("2.5-flash" in preferred or "3" in preferred) and "lite" not in preferred and "tts" not in preferred and "image" not in preferred:
+        if ("3" in preferred or "2.5-flash" in preferred) and "lite" not in preferred and "tts" not in preferred and "image" not in preferred:
             return preferred
-    return flash_candidates[0] if flash_candidates else "gemini-2.5-flash"
+    return flash_candidates[0] if flash_candidates else "gemini-3-flash-preview"
 
 def call_gemini_rest(api_key: str, model_name: str, system_instruction: str, user_text: str, use_thinking_zero: bool = True) -> dict:
-    """使用原生 REST 接口极速调用 Gemini，关闭默认慢速 Thinking 以避免 Vercel 超时"""
-    url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model_name}:generateContent?key={api_key}"
+    """使用原生 HTTPS 连接极速调用 Gemini（彻底避免 URL 字符串被剪贴板转义，且关闭慢速 Thinking）"""
+    path = f"/v1beta/models/{model_name}:generateContent?key={api_key}"
     gen_config = {
         "temperature": 0.15,
         "responseMimeType": "application/json"
@@ -66,10 +74,21 @@ def call_gemini_rest(api_key: str, model_name: str, system_instruction: str, use
         "contents": [{"role": "user", "parts": [{"text": user_text}]}],
         "generationConfig": gen_config
     }
-    data_bytes = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=8) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    payload_bytes = json.dumps(body).encode("utf-8")
+
+    conn = http.client.HTTPSConnection(API_HOST, timeout=8)
+    try:
+        conn.request("POST", path, body=payload_bytes, headers={"Content-Type": "application/json"})
+        resp = conn.getresponse()
+        raw = resp.read().decode("utf-8", errors="ignore")
+        if resp.status != 200:
+            err = RuntimeError(f"HTTP_{resp.status}:{raw[:200]}")
+            err.status_code = resp.status
+            err.err_body = raw
+            raise err
+        return json.loads(raw)
+    finally:
+        conn.close()
 
 @app.route("/analyze", methods=["POST"])
 def analyze_negotiation():
@@ -118,8 +137,9 @@ def analyze_negotiation():
 
     user_prompt = f"待分析谈判输入（已脱敏）: {sanitized_text}"
 
-    primary_model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
-    candidate_models = [primary_model, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"]
+    # 直接优先调用你账号已验证生效的 gemini-3-flash-preview
+    primary_model = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview").strip()
+    candidate_models = [primary_model, "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
     used_model = None
     raw_api_resp = None
     error_logs = []
@@ -129,18 +149,17 @@ def analyze_negotiation():
             used_model = candidate
             raw_api_resp = call_gemini_rest(api_key, candidate, system_instruction, user_prompt, use_thinking_zero=True)
             break
-        except urllib.error.HTTPError as http_err:
-            err_body = http_err.read().decode("utf-8", errors="ignore")
-            if http_err.code == 400 and "thinking" in err_body.lower():
+        except Exception as e:
+            status_code = getattr(e, "status_code", None)
+            err_body = getattr(e, "err_body", "")
+            if status_code == 400 and "thinking" in err_body.lower():
                 try:
                     raw_api_resp = call_gemini_rest(api_key, candidate, system_instruction, user_prompt, use_thinking_zero=False)
                     break
                 except Exception as retry_err:
                     error_logs.append(f"{candidate}(retry): {str(retry_err)}")
             else:
-                error_logs.append(f"{candidate}: HTTP {http_err.code}")
-        except Exception as e:
-            error_logs.append(f"{candidate}: {str(e)}")
+                error_logs.append(f"{candidate}: {str(e)}")
 
     if not raw_api_resp:
         try:
@@ -213,7 +232,6 @@ HTML_UI = r"""<!DOCTYPE html>
     <h2>⚡ Consigliere AI <span class="badge">PoC v3.1 — Ultra-Low Latency & Rule-Grounded</span></h2>
     <p style="color:#94a3b8; font-size:13px;">Personal Chief of Staff & Real-Time Game-Theoretic Copilot — Built for Horowitz Andreessen Academy</p>
 
-    <!-- 1. 规则与个人决策档案 -->
     <div class="card">
         <strong>📂 1. 首席幕僚决策档案（分析时将显式引用以下规则）</strong>
         <div class="grid-2">
@@ -230,7 +248,6 @@ HTML_UI = r"""<!DOCTYPE html>
         <input id="risk_preference" value="稳健偏好；重视长期合作关系，当对方抛出‘限时最后通牒’或‘明年大订单画饼’时容易焦虑让步。" />
     </div>
 
-    <!-- 2. 实时输入与对比测试案例集 -->
     <div class="card">
         <strong>🎙️ 2. 战中实时输入（支持一键加载正反测试集 & 浏览器本地预脱敏）</strong>
         <div class="preset-row">
@@ -251,7 +268,6 @@ HTML_UI = r"""<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- 3. 结构化输出结果（事实 vs 推断 vs 未知） -->
     <div id="error_box" class="card" style="display:none; border-color:#ef4444; color:#f87171;"></div>
     <div id="result" class="card" style="display:none;">
         <div class="meta" id="audit_view"></div>
@@ -277,7 +293,6 @@ HTML_UI = r"""<!DOCTYPE html>
         <div style="background:#18181b; border:1px solid #3f3f46; padding:10px; border-radius:6px; font-size:13px;" id="draft_box"></div>
     </div>
 
-    <!-- 4. 可验证的隐私架构与真实迭代证据 -->
     <div class="card">
         <strong>🔍 3. 隐私边界可验证说明 & 工程迭代证据 (Verifiable Privacy & Iteration Evidence)</strong>
         <p style="font-size:12px; color:#94a3b8; margin:6px 0;">
@@ -306,7 +321,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 <tr>
                     <td><strong>v3.0 → v3.1 (延迟与合规优化)</strong></td>
                     <td>测试者 #3 指出服务端脱敏仍传输原始文本；且 Gemini 2.5 默认开启 Thinking 导致推理偶发超过 Vercel 10秒限制。</td>
-                    <td>将脱敏前移至<strong>浏览器本地 JS</strong>；改用原生 REST 接口并设置 <code>thinkingBudget: 0</code> + 模型自动探测，将响应稳定压缩至 1~2 秒。</td>
+                    <td>将脱敏前移至<strong>浏览器本地 JS</strong>；改用原生 HTTPS 接口并设置 <code>thinkingBudget: 0</code> + 模型自动探测，将响应稳定压缩至 1~2 秒。</td>
                 </tr>
             </tbody>
         </table>
@@ -323,7 +338,6 @@ HTML_UI = r"""<!DOCTYPE html>
             document.getElementById('input_text').value = PRESETS[key];
         }
 
-        // 浏览器端本地预脱敏：在网络请求发出前直接对敏感实体执行替换，并精确统计替换数量
         function clientSideRedact(rawText) {
             let redacted = rawText;
             redacted = redacted.replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/g, '[REDACTED_EMAIL]');
@@ -387,7 +401,6 @@ HTML_UI = r"""<!DOCTYPE html>
 
             try {
                 const rawText = document.getElementById('input_text').value;
-                // 关键修复：直接获取前端本地的真实脱敏实体统计值
                 const scrubResult = clientSideRedact(rawText);
                 const clientScrubbedText = scrubResult.sanitizedText;
                 const localRedactedCount = scrubResult.redactedCount;
