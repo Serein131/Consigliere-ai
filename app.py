@@ -35,7 +35,7 @@ def server_fallback_redact(text: str) -> dict:
         '[COMPANY_ENTITY]',
         redacted
     )
-    count = len(re.findall(r'\[(?:REDACTED_\w+|COMPANY_ENTITY)\]', redacted))
+    count = len(re.findall(r'\[(?:REDACTED_\w+\vert{}COMPANY_ENTITY)\]', redacted))
     return {"sanitized_text": redacted, "redaction_count": count}
 
 def discover_available_flash_model(api_key: str) -> str:
@@ -55,12 +55,12 @@ def discover_available_flash_model(api_key: str) -> str:
     for m in models:
         name = m.get("name", "").replace("models/", "")
         methods = m.get("supportedGenerationMethods", [])
-        if "generateContent" in methods and "flash" in name.lower() and "2.0-flash" not in name.lower():
+        if "generateContent" in methods and "flash" in name.lower() and "2.0-flash" not in name.lower() and "2.5-flash" not in name.lower():
             flash_candidates.append(name)
     for preferred in flash_candidates:
-        if ("3" in preferred or "2.5-flash" in preferred) and "lite" not in preferred and "tts" not in preferred and "image" not in preferred:
+        if ("3.8" in preferred or "3" in preferred) and "tts" not in preferred and "image" not in preferred:
             return preferred
-    return flash_candidates[0] if flash_candidates else "gemini-3-flash-preview"
+    return flash_candidates[0] if flash_candidates else "gemini-3.8-flash"
 
 def call_gemini_rest(api_key: str, model_name: str, system_instruction: str, user_text: str, use_thinking_zero: bool = True) -> dict:
     path = f"/v1beta/models/{model_name}:generateContent?key={api_key}"
@@ -197,8 +197,9 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
 
     user_prompt = f"[{phase.upper()} INPUT (Sanitized)]: {sanitized_text}{session_history_str}"
 
-    primary_model = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview").strip()
-    candidate_models = [primary_model, "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    # 优先使用官方提示中活跃的 3.8-flash，备用 3.5-flash-lite 与 3-flash-preview
+    primary_model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    candidate_models = [primary_model, "gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview"]
     used_model = None
     raw_api_resp = None
     error_logs = []
@@ -435,6 +436,7 @@ HTML_UI = r"""<!DOCTYPE html>
         let currentLang = 'en';
         let currentPhase = 'in_deal';
         let latestTacticalOutput = null;
+        let isAgentRunning = false;
 
         let sessionMemory = {
             pre_deal: null,
@@ -756,7 +758,10 @@ HTML_UI = r"""<!DOCTYPE html>
                 recognition.onend = () => {
                     isListening = false;
                     document.getElementById('mic_btn').innerText = currentLang === 'zh' ? "🎤 开启本地语音口述" : "🎤 Dictate via Local Browser Speech";
-                    if (document.getElementById('input_text').value.trim()) runAgent();
+                    // 防抖检查：避免请求并发重叠触发限频
+                    if (!isAgentRunning && document.getElementById('input_text').value.trim()) {
+                        runAgent();
+                    }
                 };
             }
 
@@ -771,10 +776,12 @@ HTML_UI = r"""<!DOCTYPE html>
         }
 
         async function runAgent() {
+            if (isAgentRunning) return;
             const errBox = document.getElementById('error_box');
             const resBox = document.getElementById('result');
             const runBtn = document.getElementById('run_btn');
             errBox.style.display = 'none';
+            isAgentRunning = true;
             runBtn.disabled = true;
             runBtn.innerText = currentLang === 'zh' ? '⏳ 正在执行全周期博弈推演 (1~2秒)...' : '⏳ Running Game-Theoretic Deduction (1-2s)...';
 
@@ -875,6 +882,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 resBox.style.display = 'none';
             } finally {
                 clearTimeout(timeoutId);
+                isAgentRunning = false;
                 runBtn.disabled = false;
                 runBtn.innerText = currentLang === 'zh' ? '⚡ 启动全周期博弈推演' : '⚡ Execute Game-Theoretic Engine';
             }
