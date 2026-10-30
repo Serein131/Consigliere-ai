@@ -35,7 +35,7 @@ def server_fallback_redact(text: str) -> dict:
 
 def discover_available_flash_model(api_key: str) -> str:
     """当默认模型名称变动时，自动向 Google API 查询当前账号可用的最新 Flash 模型"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    url = f"[https://generativelanguage.googleapis.com/v1beta/models?key=](https://generativelanguage.googleapis.com/v1beta/models?key=){api_key}"
     req = urllib.request.Request(url, method="GET")
     with urllib.request.urlopen(req, timeout=4) as resp:
         data = json.loads(resp.read().decode("utf-8"))
@@ -53,7 +53,7 @@ def discover_available_flash_model(api_key: str) -> str:
 
 def call_gemini_rest(api_key: str, model_name: str, system_instruction: str, user_text: str, use_thinking_zero: bool = True) -> dict:
     """使用原生 REST 接口极速调用 Gemini，关闭默认慢速 Thinking 以避免 Vercel 超时"""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model_name}:generateContent?key={api_key}"
     gen_config = {
         "temperature": 0.15,
         "responseMimeType": "application/json"
@@ -213,6 +213,7 @@ HTML_UI = r"""<!DOCTYPE html>
     <h2>⚡ Consigliere AI <span class="badge">PoC v3.1 — Ultra-Low Latency & Rule-Grounded</span></h2>
     <p style="color:#94a3b8; font-size:13px;">Personal Chief of Staff & Real-Time Game-Theoretic Copilot — Built for Horowitz Andreessen Academy</p>
 
+    <!-- 1. 规则与个人决策档案 -->
     <div class="card">
         <strong>📂 1. 首席幕僚决策档案（分析时将显式引用以下规则）</strong>
         <div class="grid-2">
@@ -229,6 +230,7 @@ HTML_UI = r"""<!DOCTYPE html>
         <input id="risk_preference" value="稳健偏好；重视长期合作关系，当对方抛出‘限时最后通牒’或‘明年大订单画饼’时容易焦虑让步。" />
     </div>
 
+    <!-- 2. 实时输入与对比测试案例集 -->
     <div class="card">
         <strong>🎙️ 2. 战中实时输入（支持一键加载正反测试集 & 浏览器本地预脱敏）</strong>
         <div class="preset-row">
@@ -249,6 +251,7 @@ HTML_UI = r"""<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- 3. 结构化输出结果（事实 vs 推断 vs 未知） -->
     <div id="error_box" class="card" style="display:none; border-color:#ef4444; color:#f87171;"></div>
     <div id="result" class="card" style="display:none;">
         <div class="meta" id="audit_view"></div>
@@ -274,6 +277,7 @@ HTML_UI = r"""<!DOCTYPE html>
         <div style="background:#18181b; border:1px solid #3f3f46; padding:10px; border-radius:6px; font-size:13px;" id="draft_box"></div>
     </div>
 
+    <!-- 4. 可验证的隐私架构与真实迭代证据 -->
     <div class="card">
         <strong>🔍 3. 隐私边界可验证说明 & 工程迭代证据 (Verifiable Privacy & Iteration Evidence)</strong>
         <p style="font-size:12px; color:#94a3b8; margin:6px 0;">
@@ -319,6 +323,7 @@ HTML_UI = r"""<!DOCTYPE html>
             document.getElementById('input_text').value = PRESETS[key];
         }
 
+        // 浏览器端本地预脱敏：在网络请求发出前直接对敏感实体执行替换，并精确统计替换数量
         function clientSideRedact(rawText) {
             let redacted = rawText;
             redacted = redacted.replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/g, '[REDACTED_EMAIL]');
@@ -326,7 +331,11 @@ HTML_UI = r"""<!DOCTYPE html>
             redacted = redacted.replace(/\b([A-Z]{2,5}-\d{2,6}|\#\d{4,10})\b/g, '[REDACTED_ID]');
             redacted = redacted.replace(/(\$?\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|亿|美金|美元|元|块|k|m|b|million|billion|%)?)/gi, '[REDACTED_VALUE]');
             redacted = redacted.replace(/([A-Za-z0-9\u4e00-\u9fa5]{2,12}(?:公司|集团|科技|资本|银行|厂|Inc\.?|Corp\.?|LLC|Ltd\.?))/g, '[COMPANY_ENTITY]');
-            return redacted;
+            const matches = redacted.match(/\[(?:REDACTED_\w+|COMPANY_ENTITY)\]/g);
+            return {
+                sanitizedText: redacted,
+                redactedCount: matches ? matches.length : 0
+            };
         }
 
         let recognition = null;
@@ -378,7 +387,10 @@ HTML_UI = r"""<!DOCTYPE html>
 
             try {
                 const rawText = document.getElementById('input_text').value;
-                const clientScrubbedText = clientSideRedact(rawText);
+                // 关键修复：直接获取前端本地的真实脱敏实体统计值
+                const scrubResult = clientSideRedact(rawText);
+                const clientScrubbedText = scrubResult.sanitizedText;
+                const localRedactedCount = scrubResult.redactedCount;
 
                 const payload = {
                     mode: document.getElementById('mode').value,
@@ -412,7 +424,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 resBox.style.display = 'block';
 
                 document.getElementById('audit_view').innerHTML = 
-                    `🛡️ <strong>客户端本地预脱敏验证 (Client-Side Scrubbed)：</strong>已拦截替换 <b>${data.redacted_items_count}</b> 处敏感实体 | ⏱️ <strong>端到端耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>` +
+                    `🛡️ <strong>客户端本地预脱敏验证 (Client-Side Scrubbed)：</strong>已在浏览器本地拦截替换 <b>${localRedactedCount}</b> 处敏感实体（原始敏感词未离开设备） | ⏱️ <strong>端到端耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>` +
                     `📤 <strong>实际离开浏览器并发往模型的 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`;
 
                 const badgeColor = t.risk_level === 'SAFE' ? '#10b981' : (t.risk_level === 'LOW' ? '#f59e0b' : '#f87171');
