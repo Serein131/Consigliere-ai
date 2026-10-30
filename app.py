@@ -3,21 +3,15 @@ import re
 import time
 import json
 import logging
+import urllib.request
+import urllib.error
 from flask import Flask, request, jsonify, render_template_string
-from google import genai
-from google.genai import types
 
 app = Flask(__name__)
 
 # 关闭 Werkzeug 默认的请求体日志，确保服务器端不记录敏感请求内容
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
-
-def get_gemini_client():
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        return None
-    return genai.Client(api_key=api_key)
 
 # 二次服务端兜底脱敏（主要脱敏已在浏览器端完成，此处为 Defense-in-Depth 双重保险）
 def server_fallback_redact(text: str) -> dict:
@@ -36,52 +30,46 @@ def server_fallback_redact(text: str) -> dict:
         '[COMPANY_ENTITY]',
         redacted
     )
-    count = len(re.findall(r'\[(?:REDACTED_\w+|COMPANY_ENTITY)\]', redacted))
+    count = len(re.findall(r'\[(?:REDACTED_\w+\vert{}COMPANY_ENTITY)\]', redacted))
     return {"sanitized_text": redacted, "redaction_count": count}
 
-# 结构化推理 Schema：区分【规则引用】、【事实】、【推断】、【未知信息】与【无风险识别】
-tactical_schema = types.Schema(
-    type=types.Type.OBJECT,
-    properties={
-        "risk_level": types.Schema(
-            type=types.Type.STRING,
-            description="风险等级: SAFE (无风险/符合底线), LOW (轻微试探), MEDIUM (存在博弈诱导), CRITICAL (直接触碰底线或高压陷阱)"
-        ),
-        "trap_or_intent": types.Schema(
-            type=types.Type.STRING,
-            description="识别出的博弈陷阱名称；若为良性沟通则填 'Constructive Alignment (良性推进)'"
-        ),
-        "triggered_rule": types.Schema(
-            type=types.Type.STRING,
-            description="明确引用关联的用户【目标/预算/底线/风险偏好】中的哪一条；若未触犯底线则说明符合哪条目标"
-        ),
-        "facts_extracted": types.Schema(
-            type=types.Type.STRING,
-            description="【客观事实 (Facts)】：对方明确提出的条件或已确认的信息（不带主观臆测）"
-        ),
-        "strategic_inference": types.Schema(
-            type=types.Type.STRING,
-            description="【博弈推断 (Inferences)】：对方背后的真实动机、谈判筹码或心理施压意图"
-        ),
-        "unknowns_to_probe": types.Schema(
-            type=types.Type.STRING,
-            description="【未知信息 (Unknowns)】：当前缺失但影响决策的关键变量（需通过反问套取的信息）"
-        ),
-        "counter_question": types.Schema(
-            type=types.Type.STRING,
-            description="建议立刻说出口的黄金反问句或推进话术（25字以内，直接犀利）"
-        ),
-        "draft_reply": types.Schema(
-            type=types.Type.STRING,
-            description="可直接发送的完整得体回复草稿（兼顾分寸感与底线防守）"
-        )
-    },
-    required=[
-        "risk_level", "trap_or_intent", "triggered_rule",
-        "facts_extracted", "strategic_inference", "unknowns_to_probe",
-        "counter_question", "draft_reply"
-    ]
-)
+def discover_available_flash_model(api_key: str) -> str:
+    """当默认模型名称变动时，自动向 Google API 查询当前账号可用的最新 Flash 模型"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    req = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(req, timeout=4) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    models = data.get("models", [])
+    flash_candidates = []
+    for m in models:
+        name = m.get("name", "").replace("models/", "")
+        methods = m.get("supportedGenerationMethods", [])
+        if "generateContent" in methods and "flash" in name.lower() and "2.0-flash" not in name.lower():
+            flash_candidates.append(name)
+    for preferred in flash_candidates:
+        if ("2.5-flash" in preferred or "3" in preferred) and "lite" not in preferred and "tts" not in preferred and "image" not in preferred:
+            return preferred
+    return flash_candidates[0] if flash_candidates else "gemini-2.5-flash"
+
+def call_gemini_rest(api_key: str, model_name: str, system_instruction: str, user_text: str, use_thinking_zero: bool = True) -> dict:
+    """使用原生 REST 接口极速调用 Gemini，关闭默认慢速 Thinking 以避免 Vercel 超时"""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+    gen_config = {
+        "temperature": 0.15,
+        "responseMimeType": "application/json"
+    }
+    if use_thinking_zero and ("2.5" in model_name or "3" in model_name):
+        gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+
+    body = {
+        "systemInstruction": {"parts": [{"text": system_instruction}]},
+        "contents": [{"role": "user", "parts": [{"text": user_text}]}],
+        "generationConfig": gen_config
+    }
+    data_bytes = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data_bytes, headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=8) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 @app.route("/analyze", methods=["POST"])
 def analyze_negotiation():
@@ -97,79 +85,103 @@ def analyze_negotiation():
     if not incoming_text:
         return jsonify({"error": "请输入谈判话术或选择测试案例。"}), 400
 
-    # 服务端二次兜底检查（前端已脱敏过一次）
     redaction_result = server_fallback_redact(incoming_text)
     sanitized_text = redaction_result["sanitized_text"]
 
-    client = get_gemini_client()
-    if not client:
-        return jsonify({"error": "未检测到 GEMINI_API_KEY。请在环境变量中配置。"}), 500
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return jsonify({"error": "未检测到 GEMINI_API_KEY。请在 Vercel 环境变量中配置。"}), 500
 
-    system_instruction = f"""
-    你是用户的个人首席幕僚与实时博弈决策引擎（Consigliere AI v3.0）。
-    你必须严格基于用户设定的【核心目标与预算】、【绝对底线】和【风险与性格偏好】进行推理：
-    - 【核心目标与预算】：{user_goal}
-    - 【绝对底线 (Hard Bottom Lines)】：{hard_bottom_line}
-    - 【风险偏好与性格弱点】：{risk_preference}
-    - 【交互通道】：{mode}
+    system_instruction = f"""你是用户的个人首席幕僚与实时博弈决策引擎（Consigliere AI v3.1）。
+你必须严格基于用户设定的【核心目标与预算】、【绝对底线】和【风险与性格偏好】进行推理：
+- 【核心目标与预算】：{user_goal}
+- 【绝对底线 (Hard Bottom Lines)】：{hard_bottom_line}
+- 【风险偏好与性格弱点】：{risk_preference}
+- 【交互通道】：{mode}
 
-    推理铁律：
-    1. 严禁盲目报警（No False Positives）：如果对方的话术完全符合用户的目标与底线（如接受账期、正常确认合作流程），必须将 risk_level 设为 "SAFE"，并给出积极推进的确认话术。
-    2. 严格区分【客观事实 (Facts)】、【博弈推断 (Inferences)】和【未知盲区 (Unknowns)】，帮助用户保持绝对理性。
-    3. 必须明确指出对方触发或符合了用户的哪一条具体规则（triggered_rule）。
-    """
+推理铁律：
+1. 严禁盲目报警（No False Positives）：如果对方的话术完全符合用户的目标与底线（如接受账期、正常确认合作流程），必须将 risk_level 设为 "SAFE"，trap_or_intent 设为 "Constructive Alignment (良性推进)"。
+2. 严格区分【客观事实 (Facts)】、【博弈推断 (Inferences)】和【未知盲区 (Unknowns)】。
+3. 必须明确指出对方触发或符合了用户的哪一条具体规则（triggered_rule）。
+
+请严格只输出一个合法的 JSON 对象，必须包含以下 8 个字符串字段（不要使用 Markdown 代码块包裹）：
+{{
+  "risk_level": "SAFE 或 LOW 或 MEDIUM 或 CRITICAL",
+  "trap_or_intent": "识别出的博弈陷阱名称（中英双语），若无风险则填 Constructive Alignment (良性推进)",
+  "triggered_rule": "明确引用触发或符合的用户【目标/预算/底线/风险偏好】具体条款",
+  "facts_extracted": "【客观事实】：对方明确提出的条件或已确认的信息（不带主观臆测）",
+  "strategic_inference": "【博弈推断】：对方背后的真实动机、谈判筹码或心理施压意图",
+  "unknowns_to_probe": "【未知信息】：当前缺失但影响决策的关键变量（需通过反问套取的信息）",
+  "counter_question": "建议立刻说出口的黄金反问句或推进话术（25字以内，直接犀利）",
+  "draft_reply": "可直接复制发送的完整得体回复草稿（兼顾分寸感与底线防守）"
+}}"""
+
+    user_prompt = f"待分析谈判输入（已脱敏）: {sanitized_text}"
+
+    primary_model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
+    candidate_models = [primary_model, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview"]
+    used_model = None
+    raw_api_resp = None
+    error_logs = []
+
+    for candidate in dict.fromkeys(candidate_models):
+        try:
+            used_model = candidate
+            raw_api_resp = call_gemini_rest(api_key, candidate, system_instruction, user_prompt, use_thinking_zero=True)
+            break
+        except urllib.error.HTTPError as http_err:
+            err_body = http_err.read().decode("utf-8", errors="ignore")
+            if http_err.code == 400 and "thinking" in err_body.lower():
+                try:
+                    raw_api_resp = call_gemini_rest(api_key, candidate, system_instruction, user_prompt, use_thinking_zero=False)
+                    break
+                except Exception as retry_err:
+                    error_logs.append(f"{candidate}(retry): {str(retry_err)}")
+            else:
+                error_logs.append(f"{candidate}: HTTP {http_err.code}")
+        except Exception as e:
+            error_logs.append(f"{candidate}: {str(e)}")
+
+    if not raw_api_resp:
+        try:
+            discovered = discover_available_flash_model(api_key)
+            used_model = discovered
+            raw_api_resp = call_gemini_rest(api_key, discovered, system_instruction, user_prompt, use_thinking_zero=False)
+        except Exception as disc_err:
+            return jsonify({
+                "error": f"模型调用失败。尝试记录: {'; '.join(error_logs)} | 动态探测错误: {str(disc_err)}"
+            }), 500
 
     try:
-        # 优先调用 Google 官方最新提示的 gemini-3.8-flash 模型，并配置多模型自动降级兜底
-        candidate_models = [
-            os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"),
-            "gemini-3.8-flash",
-            "gemini-2.5-flash"
-        ]
-        response = None
-        model_name = None
-        last_err = None
+        candidates = raw_api_resp.get("candidates", [])
+        parts = candidates[0].get("content", {}).get("parts", [])
+        text_out = ""
+        for p in parts:
+            if "text" in p and not p.get("thought", False):
+                text_out += p["text"]
+        text_out = text_out.strip()
+        if text_out.startswith("```"):
+            text_out = re.sub(r"^```(?:json)?\s*|\s*```$", "", text_out, flags=re.DOTALL).strip()
 
-        for candidate in dict.fromkeys(candidate_models):
-            try:
-                model_name = candidate
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=f"待分析谈判输入（已脱敏）: {sanitized_text}",
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.15,
-                        response_mime_type="application/json",
-                        response_schema=tactical_schema,
-                    ),
-                )
-                break
-            except Exception as loop_err:
-                last_err = loop_err
-
-        if not response:
-            raise last_err
-
-        tactical_output = json.loads(response.text)
+        tactical_output = json.loads(text_out)
         latency_ms = round((time.perf_counter() - start_time) * 1000)
 
         return jsonify({
             "sanitized_payload_sent_to_llm": sanitized_text,
             "redacted_items_count": redaction_result["redaction_count"],
             "measured_latency_ms": latency_ms,
-            "model_used": model_name,
+            "model_used": used_model,
             "tactical_advice": tactical_output
         })
-    except Exception as e:
-        return jsonify({"error": f"模型调用失败: {str(e)}"}), 500
+    except Exception as parse_err:
+        return jsonify({"error": f"解析模型输出失败: {str(parse_err)}"}), 500
 
-HTML_UI = """
-<!DOCTYPE html>
+HTML_UI = r"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v3.0 — Decision & Negotiation Copilot</title>
+    <title>Consigliere AI v3.1 — Decision & Negotiation Copilot</title>
     <style>
         body { background: #090a0f; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; padding: 20px; max-width: 840px; margin: auto; line-height: 1.5; }
         .badge { background: #1e293b; color: #38bdf8; padding: 3px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #0284c7; }
@@ -198,10 +210,9 @@ HTML_UI = """
     </style>
 </head>
 <body>
-    <h2>⚡ Consigliere AI <span class="badge">PoC v3.0 — Rule-Grounded & Client-Scrubbed</span></h2>
+    <h2>⚡ Consigliere AI <span class="badge">PoC v3.1 — Ultra-Low Latency & Rule-Grounded</span></h2>
     <p style="color:#94a3b8; font-size:13px;">Personal Chief of Staff & Real-Time Game-Theoretic Copilot — Built for Horowitz Andreessen Academy</p>
 
-    <!-- 1. 规则与个人决策档案 -->
     <div class="card">
         <strong>📂 1. 首席幕僚决策档案（分析时将显式引用以下规则）</strong>
         <div class="grid-2">
@@ -218,7 +229,6 @@ HTML_UI = """
         <input id="risk_preference" value="稳健偏好；重视长期合作关系，当对方抛出‘限时最后通牒’或‘明年大订单画饼’时容易焦虑让步。" />
     </div>
 
-    <!-- 2. 实时输入与对比测试案例集 -->
     <div class="card">
         <strong>🎙️ 2. 战中实时输入（支持一键加载正反测试集 & 浏览器本地预脱敏）</strong>
         <div class="preset-row">
@@ -239,7 +249,6 @@ HTML_UI = """
         </div>
     </div>
 
-    <!-- 3. 结构化输出结果（事实 vs 推断 vs 未知） -->
     <div id="error_box" class="card" style="display:none; border-color:#ef4444; color:#f87171;"></div>
     <div id="result" class="card" style="display:none;">
         <div class="meta" id="audit_view"></div>
@@ -265,12 +274,11 @@ HTML_UI = """
         <div style="background:#18181b; border:1px solid #3f3f46; padding:10px; border-radius:6px; font-size:13px;" id="draft_box"></div>
     </div>
 
-    <!-- 4. 可验证的隐私架构与真实迭代证据 -->
     <div class="card">
         <strong>🔍 3. 隐私边界可验证说明 & 工程迭代证据 (Verifiable Privacy & Iteration Evidence)</strong>
         <p style="font-size:12px; color:#94a3b8; margin:6px 0;">
             • <strong>可验证的客户端脱敏 (Verifiable Client-Side Scrubbing)：</strong>您可以按 <code>F12</code> 打开浏览器 <code>Network</code> 面板检查 <code>/analyze</code> 请求——邮箱、电话、合同号、金额与公司名在<strong>浏览器端 JavaScript 发送请求前已被正则脱敏</strong>，原始敏感词绝不离开本地浏览器。已知局限：当前正则对非标准简称（如未带“公司/集团”后缀的口语代号）存在漏网可能，且脱敏后的逻辑结构仍由 Google Gemini API 处理。<br>
-            • <strong>真实开发与用户测试迭代记录 (v1.0 → v3.0 Iteration Log)：</strong>
+            • <strong>真实开发与用户测试迭代记录 (v1.0 → v3.1 Iteration Log)：</strong>
         </p>
         <table>
             <thead>
@@ -289,12 +297,12 @@ HTML_UI = """
                 <tr>
                     <td><strong>v2.0 (3人模拟谈判测试)</strong></td>
                     <td>测试者 #2（商务BD）反馈：“只给一句反问太单薄，分不清哪些是对方明确说的、哪些是 AI 猜的，且不知道怎么回完整消息。”</td>
-                    <td>重构 Gemini Schema，强制分离<strong>【事实 / 推断 / 未知信息】</strong>三栏，并新增可直接复制发送的<strong>完整得体回复草稿</strong>。</td>
+                    <td>重构输出结构，强制分离<strong>【事实 / 推断 / 未知信息】</strong>三栏，并新增可直接复制发送的<strong>完整得体回复草稿</strong>。</td>
                 </tr>
                 <tr>
-                    <td><strong>v3.0 (隐私合规审查)</strong></td>
-                    <td>测试者 #3（开发者）指出：“先前在 Flask 后端做脱敏意味着原始文本还是通过 HTTP 传到了 Vercel 服务器。”</td>
-                    <td>将脱敏引擎前移至<strong>浏览器本地 JS</strong>（服务端保留二次兜底），并关闭 Flask 请求体日志，确保可通过浏览器 Network 面板审计。</td>
+                    <td><strong>v3.0 → v3.1 (延迟与合规优化)</strong></td>
+                    <td>测试者 #3 指出服务端脱敏仍传输原始文本；且 Gemini 2.5 默认开启 Thinking 导致推理偶发超过 Vercel 10秒限制。</td>
+                    <td>将脱敏前移至<strong>浏览器本地 JS</strong>；改用原生 REST 接口并设置 <code>thinkingBudget: 0</code> + 模型自动探测，将响应稳定压缩至 1~2 秒。</td>
                 </tr>
             </tbody>
         </table>
@@ -311,14 +319,13 @@ HTML_UI = """
             document.getElementById('input_text').value = PRESETS[key];
         }
 
-        // 浏览器端本地预脱敏：在发送 HTTP 请求前直接抹除敏感词（可在浏览器 F12 Network 面板验证）
         function clientSideRedact(rawText) {
             let redacted = rawText;
-            redacted = redacted.replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+/g, '[REDACTED_EMAIL]');
-            redacted = redacted.replace(/(\\+?\\d{1,3}[-\\s]?)?\\(?\\d{3}\\)?[-\\s]?\\d{3,4}[-\\s]?\\d{4}/g, '[REDACTED_PHONE]');
-            redacted = redacted.replace(/\\b([A-Z]{2,5}-\\d{2,6}|\\#\\d{4,10})\\b/g, '[REDACTED_ID]');
-            redacted = redacted.replace(/(\\$?\\d+(?:,\\d{3})*(?:\\.\\d+)?\\s*(?:万|亿|美金|美元|元|块|k|m|b|million|billion|%)?)/gi, '[REDACTED_VALUE]');
-            redacted = redacted.replace(/([A-Za-z0-9\\u4e00-\\u9fa5]{2,12}(?:公司|集团|科技|资本|银行|厂|Inc\\.?|Corp\\.?|LLC|Ltd\\.?))/g, '[COMPANY_ENTITY]');
+            redacted = redacted.replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/g, '[REDACTED_EMAIL]');
+            redacted = redacted.replace(/(\+?\d{1,3}[-\s]?)?\(?\d{3}\)?[-\s]?\d{3,4}[-\s]?\d{4}/g, '[REDACTED_PHONE]');
+            redacted = redacted.replace(/\b([A-Z]{2,5}-\d{2,6}|\#\d{4,10})\b/g, '[REDACTED_ID]');
+            redacted = redacted.replace(/(\$?\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万|亿|美金|美元|元|块|k|m|b|million|billion|%)?)/gi, '[REDACTED_VALUE]');
+            redacted = redacted.replace(/([A-Za-z0-9\u4e00-\u9fa5]{2,12}(?:公司|集团|科技|资本|银行|厂|Inc\.?|Corp\.?|LLC|Ltd\.?))/g, '[COMPANY_ENTITY]');
             return redacted;
         }
 
@@ -363,11 +370,14 @@ HTML_UI = """
             const resBox = document.getElementById('result');
             const runBtn = document.getElementById('run_btn');
             errBox.style.display = 'none';
-            runBtn.innerText = '⏳ 正在执行规则对齐与三元拆解...';
+            runBtn.disabled = true;
+            runBtn.innerText = '⏳ 正在执行规则对齐与三元拆解 (约1~3秒)...';
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
 
             try {
                 const rawText = document.getElementById('input_text').value;
-                // 关键一步：在客户端浏览器内直接完成脱敏，原始文本绝不通过网络发出
                 const clientScrubbedText = clientSideRedact(rawText);
 
                 const payload = {
@@ -381,19 +391,24 @@ HTML_UI = """
                 const res = await fetch('/analyze', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
                 });
-                const data = await res.json();
+
+                const rawResponseText = await res.text();
+                let data = {};
+                try {
+                    data = JSON.parse(rawResponseText);
+                } catch (jsonErr) {
+                    throw new Error(`服务器返回了非 JSON 响应 (HTTP ${res.status}): ${rawResponseText.slice(0, 160)}`);
+                }
 
                 if (!res.ok || data.error) {
-                    errBox.style.display = 'block';
-                    errBox.innerText = '⚠️ ' + (data.error || '请求失败');
-                    resBox.style.display = 'none';
-                    return;
+                    throw new Error(data.error || `请求失败 (HTTP ${res.status})`);
                 }
 
                 const t = data.tactical_advice;
-                resBox.className = 'card risk-' + t.risk_level;
+                resBox.className = 'card risk-' + (t.risk_level || 'MEDIUM');
                 resBox.style.display = 'block';
 
                 document.getElementById('audit_view').innerHTML = 
@@ -411,7 +426,13 @@ HTML_UI = """
 
                 document.getElementById('counter_q').innerText = `🎯 建议当场话术：“${t.counter_question}”`;
                 document.getElementById('draft_box').innerText = `✉️ 完整回复草稿（可直接复制）：${t.draft_reply}`;
+            } catch (err) {
+                errBox.style.display = 'block';
+                errBox.innerText = '⚠️ 运行提示: ' + (err.name === 'AbortError' ? '请求超过 15 秒超时，请重试。' : err.message);
+                resBox.style.display = 'none';
             } finally {
+                clearTimeout(timeoutId);
+                runBtn.disabled = false;
                 runBtn.innerText = '⚡ 执行规则推演与事实拆解';
             }
         }
@@ -427,4 +448,3 @@ def index():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
-
