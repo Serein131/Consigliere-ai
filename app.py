@@ -172,7 +172,7 @@ Objective: The user dictated a 60s summary right after the meeting. Cross-examin
         if session_context.get("in_deal"):
             session_history_str += f"\n[STAGE 2 IN-DEAL HISTORY (Live Context)]: {json.dumps(session_context['in_deal'], ensure_ascii=False)}"
 
-    system_instruction = f"""You are Consigliere AI (v4.4), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
+    system_instruction = f"""You are Consigliere AI (v4.5), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
 You replace illegal/intrusive full-room audio recording with a 3-stage cognitive defense architecture.
 
 USER STRATEGIC PROFILE (MEMORY BANK):
@@ -269,60 +269,508 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v4.4 — Full-Cycle Game-Theoretic Chief of Staff</title>
+    <title>Consigliere AI v4.5 — Full-Cycle Game-Theoretic Chief of Staff</title>
     <style>
-        body { background: #090a0f; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; padding: 20px; max-width: 880px; margin: auto; line-height: 1.5; }
-        .badge { background: #1e293b; color: #38bdf8; padding: 3px 8px; border-radius: 4px; font-size: 12px; border: 1px solid #0284c7; }
-        .card { background: #12141d; border: 1px solid #27272a; border-radius: 8px; padding: 16px; margin-top: 14px; }
-        .risk-CRITICAL, .risk-MEDIUM { border-left: 4px solid #ef4444; }
-        .risk-LOW { border-left: 4px solid #f59e0b; }
-        .risk-SAFE { border-left: 4px solid #10b981; }
-        label { font-size: 12px; color: #94a3b8; display: block; margin-top: 10px; font-weight: 600; }
-        input, select, textarea, button { background: #18181b; color: #fff; border: 1px solid #3f3f46; padding: 9px; border-radius: 6px; width: 100%; margin-top: 5px; box-sizing: border-box; font-size: 13px; }
-        .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .lang-switch { display: flex; gap: 6px; width: auto; }
-        .lang-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; width: auto; margin-top: 0; }
-        .lang-btn.active { background: #2563eb; color: #fff; border-color: #3b82f6; font-weight: bold; }
-        .phase-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .phase-tab { background: #18181b; border: 1px solid #334155; color: #94a3b8; padding: 10px; border-radius: 6px; cursor: pointer; text-align: left; transition: 0.15s; margin-top: 0; }
-        .phase-tab:hover { background: #1e293b; }
-        .phase-tab.active { background: #1e293b; border: 1.5px solid #38bdf8; color: #fff; box-shadow: 0 0 12px rgba(56, 189, 248, 0.15); }
-        .phase-tab-title { font-weight: bold; font-size: 13px; color: #38bdf8; display: block; }
-        .phase-tab-desc { font-size: 11px; color: #94a3b8; margin-top: 2px; display: block; }
-        .session-bar { display: flex; justify-content: space-between; align-items: center; background: #18181b; border: 1px solid #27272a; padding: 8px 12px; border-radius: 6px; font-size: 12px; color: #94a3b8; margin-top: 10px; flex-wrap: wrap; gap: 8px; }
-        .session-status { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .session-dot { font-weight: bold; }
-        .btn-reset { background: #27272a; border: 1px solid #3f3f46; color: #cbd5e1; padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; width: auto; margin-top: 0; }
-        .btn-reset:hover { background: #3f3f46; color: #fff; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .preset-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-        .preset-btn { background: #1e293b; border: 1px solid #334155; color: #cbd5e1; padding: 6px 10px; font-size: 12px; width: auto; cursor: pointer; border-radius: 4px; }
-        .preset-btn:hover { background: #334155; }
-        .btn-row { display: flex; gap: 10px; margin-top: 12px; }
-        button.primary { background: #2563eb; border: none; font-weight: bold; cursor: pointer; font-size: 14px; }
-        button.mic-btn { background: #059669; border: none; font-weight: bold; cursor: pointer; font-size: 14px; }
-        button.mic-btn.active { background: #dc2626; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        .tri-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }
-        .tri-box { background: #18181b; border: 1px solid #27272a; padding: 10px; border-radius: 6px; font-size: 12px; }
-        .tri-title { color: #38bdf8; font-weight: bold; margin-bottom: 4px; font-size: 12px; }
-        .counter-row { display: flex; justify-content: space-between; align-items: center; margin: 12px 0 8px 0; flex-wrap: wrap; gap: 8px; }
-        .counter { font-size: 15px; color: #facc15; font-weight: bold; }
-        .action-btns { display: flex; gap: 8px; margin-top: 8px; }
-        .action-btn { background: #1e293b; border: 1px solid #3b82f6; color: #60a5fa; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; width: auto; font-weight: 600; margin-top: 0; }
-        .action-btn:hover { background: #2563eb; color: #fff; }
-        .meta { font-size: 12px; color: #10b981; background: #064e3b33; padding: 10px; border-radius: 6px; border: 1px solid #05966955; word-break: break-all; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-        th, td { border: 1px solid #27272a; padding: 8px; text-align: left; }
-        th { background: #18181b; color: #94a3b8; }
-        @media (max-width: 680px) { .grid-2, .tri-grid, .phase-tabs { grid-template-columns: 1fr; } }
+        :root {
+            --bg-canvas: #f8fafc;
+            --card-bg: #ffffff;
+            --border-subtle: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --text-label: #334155;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --primary-light: #eff6ff;
+            --emerald: #059669;
+            --emerald-light: #ecfdf5;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            background-image: radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.08), transparent 60%);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            padding: 36px 20px 60px 20px;
+            max-width: 920px;
+            margin: auto;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .main-title {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #0f172a;
+            margin: 0 0 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 12.5px;
+            font-weight: 600;
+            border: 1px solid #bfdbfe;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 13.5px;
+            font-weight: 500;
+        }
+
+        .lang-switch {
+            display: flex;
+            background: #e2e8f0;
+            padding: 3px;
+            border-radius: 8px;
+            gap: 2px;
+        }
+
+        .lang-btn {
+            background: transparent;
+            border: none;
+            color: #64748b;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            width: auto;
+            margin: 0;
+        }
+
+        .lang-btn.active {
+            background: #ffffff;
+            color: #0f172a;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 22px 24px;
+            margin-top: 18px;
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+            display: block;
+            margin-bottom: 4px;
+            letter-spacing: -0.01em;
+        }
+
+        label {
+            font-size: 13.5px;
+            color: var(--text-label);
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        input, select, textarea {
+            background: #f8fafc;
+            color: #0f172a;
+            border: 1.5px solid #cbd5e1;
+            padding: 11px 14px;
+            border-radius: 9px;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 14.5px;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            background: #ffffff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.12);
+            outline: none;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .phase-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .phase-tab {
+            background: #ffffff;
+            border: 1.5px solid #e2e8f0;
+            padding: 13px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+            margin: 0;
+            width: 100%;
+        }
+
+        .phase-tab:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+        }
+
+        .phase-tab.active {
+            background: #eff6ff;
+            border: 2px solid #2563eb;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
+        }
+
+        .phase-tab-title {
+            font-weight: 700;
+            font-size: 14.5px;
+            color: #1e293b;
+            display: block;
+        }
+
+        .phase-tab.active .phase-tab-title {
+            color: #1d4ed8;
+        }
+
+        .phase-tab-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            display: block;
+            line-height: 1.4;
+        }
+
+        .session-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 10px 16px;
+            border-radius: 9px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 14px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .session-status {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            font-weight: 500;
+        }
+
+        .session-dot {
+            font-weight: 600;
+        }
+
+        .btn-reset {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            width: auto;
+            margin: 0;
+            transition: all 0.15s ease;
+        }
+
+        .btn-reset:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+            border-color: #94a3b8;
+        }
+
+        .preset-row {
+            display: flex;
+            gap: 9px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            padding: 7px 15px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            width: auto;
+        }
+
+        .preset-btn:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+            transform: translateY(-1px);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 14px;
+            margin-top: 16px;
+        }
+
+        button.primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        button.primary:hover {
+            background: linear-gradient(135deg, #1d4ed8, #1e40af);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+        }
+
+        button.mic-btn {
+            background: linear-gradient(135deg, #059669, #047857);
+            color: #ffffff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        button.mic-btn:hover {
+            background: linear-gradient(135deg, #047857, #065f46);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35);
+        }
+
+        button.mic-btn.active {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            animation: pulse-ring 1.5s infinite;
+            box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.02); opacity: 0.9; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .card.risk-CRITICAL, .card.risk-MEDIUM {
+            border-left: 6px solid #ef4444;
+            background: #ffffff;
+        }
+
+        .card.risk-LOW {
+            border-left: 6px solid #f59e0b;
+            background: #ffffff;
+        }
+
+        .card.risk-SAFE {
+            border-left: 6px solid #10b981;
+            background: #ffffff;
+        }
+
+        .meta {
+            font-size: 13.5px;
+            color: #065f46;
+            background: #f0fdf4;
+            padding: 13px 16px;
+            border-radius: 9px;
+            border: 1px solid #bbf7d0;
+            word-break: break-all;
+            line-height: 1.6;
+        }
+
+        .trap-header {
+            font-size: 19px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            margin: 16px 0 6px 0;
+        }
+
+        .tri-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 14px;
+            margin-top: 16px;
+        }
+
+        .tri-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 14px 16px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            line-height: 1.6;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+
+        .tri-title {
+            color: #1d4ed8;
+            font-weight: 700;
+            margin-bottom: 6px;
+            font-size: 13.5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .counter-banner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fffbeb;
+            border: 1.5px solid #fde68a;
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin: 16px 0 12px 0;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .counter-text {
+            font-size: 16px;
+            color: #92400e;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+
+        .draft-container {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            color: #1e293b;
+            padding: 18px 20px;
+            border-radius: 10px;
+            font-size: 14.5px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            font-family: inherit;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            color: #1e293b;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+            width: auto;
+            margin: 0;
+        }
+
+        .action-btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+
+        .action-btn.primary-action {
+            border-color: #2563eb;
+            color: #1d4ed8;
+            background: #eff6ff;
+        }
+
+        .action-btn.primary-action:hover {
+            background: #2563eb;
+            color: #ffffff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13.5px;
+            margin-top: 12px;
+        }
+
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 12px 14px;
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 700;
+        }
+
+        td {
+            color: #334155;
+            background: #ffffff;
+        }
+
+        @media (max-width: 680px) {
+            body { padding: 16px 12px; }
+            .grid-2, .tri-grid, .phase-tabs, .btn-row { grid-template-columns: 1fr; flex-direction: column; }
+            .card { padding: 18px 16px; }
+        }
     </style>
 </head>
 <body>
     <div class="header-row">
         <div>
-            <h2 style="margin:0 0 4px 0;">⚡ Consigliere AI <span class="badge">v4.4 — Fault-Tolerant Chief of Staff</span></h2>
-            <span style="color:#94a3b8; font-size:13px;" id="subtitle_text">Solving Recording & Acoustic Noise: T-15m Wargame • Noise-Suppressed In-Deal • T+0m Debrief</span>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v4.5 — Fault-Tolerant Chief of Staff</span></div>
+            <div class="subtitle" id="subtitle_text">Solving Recording & Acoustic Noise: T-15m Wargame • Noise-Suppressed In-Deal • T+0m Debrief</div>
         </div>
         <div class="lang-switch">
             <button type="button" class="lang-btn" id="btn_en" onclick="setLanguage('en')">🇺🇸 English</button>
@@ -332,7 +780,7 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <!-- 1. 首席幕僚记忆库 -->
     <div class="card">
-        <strong id="sec1_title">📂 1. Chief of Staff Memory Bank (Reservation Values, Calendar Context & Vulnerabilities)</strong>
+        <strong class="card-title" id="sec1_title">📂 1. Chief of Staff Memory Bank (Reservation Values, Calendar Context & Vulnerabilities)</strong>
         <div class="grid-2">
             <div>
                 <label id="lbl_goal">🎯 Core Goal, Budget & Timeline:</label>
@@ -349,7 +797,7 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <!-- 2. 全周期三阶段切换与输入 -->
     <div class="card">
-        <strong id="sec2_title">🛡️ 2. Full-Cycle Negotiation Defense (No Continuous Audio Surveillance Required)</strong>
+        <strong class="card-title" id="sec2_title">🛡️ 2. Full-Cycle Negotiation Defense (No Continuous Audio Surveillance Required)</strong>
         <div class="phase-tabs">
             <button type="button" class="phase-tab" id="tab_pre_deal" onclick="setPhase('pre_deal')">
                 <span class="phase-tab-title" id="tab1_t">🕒 Stage 1: T-15m Pre-Deal</span>
@@ -365,13 +813,12 @@ HTML_UI = r"""<!DOCTYPE html>
             </button>
         </div>
 
-        <!-- 全周期状态流转指示器 -->
         <div class="session-bar">
             <div class="session-status">
                 <span id="session_label">🔗 Session Chain:</span>
-                <span id="dot_p1" class="session-dot" style="color:#64748b;">⚪ T-15m Wargame</span>
-                <span id="dot_p2" class="session-dot" style="color:#64748b;">⚪ Live Stealth</span>
-                <span id="dot_p3" class="session-dot" style="color:#64748b;">⚪ Post-Debrief</span>
+                <span id="dot_p1" class="session-dot" style="color:#059669;">⚪ T-15m Wargame</span>
+                <span id="dot_p2" class="session-dot" style="color:#059669;">⚪ Live Stealth</span>
+                <span id="dot_p3" class="session-dot" style="color:#059669;">⚪ Post-Debrief</span>
             </div>
             <button type="button" class="btn-reset" onclick="resetSessionChain()" id="btn_reset_session">🔄 Reset Session Memory</button>
         </div>
@@ -400,11 +847,11 @@ HTML_UI = r"""<!DOCTYPE html>
     </div>
 
     <!-- 3. 动态三元博弈输出区 -->
-    <div id="error_box" class="card" style="display:none; border-color:#ef4444; color:#f87171;"></div>
+    <div id="error_box" class="card" style="display:none; border-color:#f87171; background:#fef2f2; color:#b91c1c;"></div>
     <div id="result" class="card" style="display:none;">
         <div class="meta" id="audit_view"></div>
-        <h3 id="trap_title" style="margin: 12px 0 4px 0;"></h3>
-        <div id="rule_cited" style="font-size:13px; color:#38bdf8; font-weight:600; margin-bottom:8px;"></div>
+        <div class="trap-header" id="trap_title"></div>
+        <div id="rule_cited" style="font-size:14px; color:#0284c7; font-weight:700; margin-bottom:10px;"></div>
 
         <div class="tri-grid">
             <div class="tri-box">
@@ -421,24 +868,24 @@ HTML_UI = r"""<!DOCTYPE html>
             </div>
         </div>
 
-        <div class="counter-row">
-            <div class="counter" id="counter_q"></div>
+        <div class="counter-banner">
+            <div class="counter-text" id="counter_q"></div>
             <button type="button" class="action-btn" onclick="copyCounterQuestion()" id="btn_copy_q">📋 Copy Alert</button>
         </div>
 
-        <div style="background:#18181b; border:1px solid #3f3f46; padding:12px; border-radius:6px; font-size:13px; white-space:pre-wrap;" id="draft_box"></div>
+        <div class="draft-container" id="draft_box"></div>
 
         <div class="action-btns">
-            <button type="button" class="action-btn" onclick="copyDraftReply()" id="btn_copy_draft">📋 Copy Full Draft / Email</button>
+            <button type="button" class="action-btn primary-action" onclick="copyDraftReply()" id="btn_copy_draft">📋 Copy Full Draft / Email</button>
             <button type="button" class="action-btn" onclick="openMailClient()" id="btn_mail_client">✉️ Open in Mail Client</button>
-            <span id="copy_toast" style="color:#10b981; font-size:12px; align-self:center; display:none;">✅ Copied to clipboard!</span>
+            <span id="copy_toast" style="color:#059669; font-weight:600; font-size:13px; align-self:center; display:none;">✅ Copied to clipboard!</span>
         </div>
     </div>
 
     <!-- 4. 博弈论内核、隐私边界与工程迭代证据 -->
     <div class="card">
-        <strong id="sec3_title">🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log</strong>
-        <p style="font-size:12px; color:#94a3b8; margin:6px 0;" id="privacy_desc"></p>
+        <strong class="card-title" id="sec3_title">🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log</strong>
+        <p style="font-size:13.5px; color:#64748b; margin:8px 0 14px 0;" id="privacy_desc"></p>
         <div id="iteration_table_container"></div>
     </div>
 
@@ -536,9 +983,9 @@ HTML_UI = r"""<!DOCTYPE html>
         }
 
         function updateSessionUI() {
-            const p1Color = sessionMemory.pre_deal ? '#10b981' : '#64748b';
-            const p2Color = sessionMemory.in_deal ? '#10b981' : '#64748b';
-            const p3Color = sessionMemory.post_deal ? '#10b981' : '#64748b';
+            const p1Color = sessionMemory.pre_deal ? '#059669' : '#94a3b8';
+            const p2Color = sessionMemory.in_deal ? '#059669' : '#94a3b8';
+            const p3Color = sessionMemory.post_deal ? '#059669' : '#94a3b8';
 
             if (currentLang === 'zh') {
                 document.getElementById('session_label').innerText = '🔗 全周期会话链路：';
@@ -585,9 +1032,9 @@ HTML_UI = r"""<!DOCTYPE html>
                                 <td>强制执行认识论三元拆解（事实/推断/未知），修复正则保护时间词，加入中英自适应。</td>
                             </tr>
                             <tr>
-                                <td><strong>v3.2 → v4.4</strong></td>
-                                <td>现场杂音和长篇发言易被截断；20秒硬切断会丢失重要施压信息；偶发429配额限制。</td>
-                                <td>彻底废除硬性倒计时，支持2~3分钟持续倾听并加入4.5秒自然停顿检测；前端激活硬件声学降噪，后端注入贝叶斯模糊纠偏指令，模型无缝升级至 <code>gemini-3.5-flash-lite</code>。</td>
+                                <td><strong>v3.2 → v4.5</strong></td>
+                                <td>暗黑界面较为单一且字号偏小；长篇发言易被截断；高频并发偶发429限制。</td>
+                                <td>升级为高质感轻奢白底大字号现代UI，支持2~3分钟长语音倾听并加入4.5秒自然停顿检测；前端激活硬件声学降噪DSP，后端注入贝叶斯模糊纠偏指令，首选模型升级至 <code>gemini-3.5-flash-lite</code>。</td>
                             </tr>
                         </tbody>
                     </table>
@@ -614,9 +1061,9 @@ HTML_UI = r"""<!DOCTYPE html>
                                 <td>Enforced Epistemic Game Theory split (Facts / Inferences / Unknowns), refined regex to protect time units, and added EN/ZH auto-adaptation.</td>
                             </tr>
                             <tr>
-                                <td><strong>v3.2 → v4.4</strong></td>
-                                <td>Acoustic noise and long speeches truncated by rigid timers; rapid retries triggered 429 quota exhaustion.</td>
-                                <td>Replaced rigid timers with user-controlled continuous STT & 4.5s natural pause detection; integrated Web Audio DSP, Bayesian fuzzy repair, and migrated to <code>gemini-3.5-flash-lite</code>.</td>
+                                <td><strong>v3.2 → v4.5</strong></td>
+                                <td>Dark theme felt dense and small; rigid timers truncated long speeches; 429 quota limits during rapid retries.</td>
+                                <td>Redesigned to a high-end light Executive UI with enlarged typography, continuous multi-minute STT, hardware Web Audio DSP, Bayesian fuzzy repair, and migration to <code>gemini-3.5-flash-lite</code>.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -751,7 +1198,6 @@ HTML_UI = r"""<!DOCTYPE html>
         let recognition = null;
         let isListening = false;
 
-        // 第二层 + 第三层重构：开启持续多分钟长语音捕获，由用户手动掌控或智能静音4.5秒探测
         async function toggleMic() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
@@ -760,7 +1206,6 @@ HTML_UI = r"""<!DOCTYPE html>
             }
 
             if (!isListening) {
-                // 第二层：通过 getUserMedia 强制激活系统 CoreAudio 硬件级降噪与回声消除
                 try {
                     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                         audioStream = await navigator.mediaDevices.getUserMedia({
@@ -777,8 +1222,8 @@ HTML_UI = r"""<!DOCTYPE html>
 
                 if (!recognition) {
                     recognition = new SpeechRecognition();
-                    recognition.continuous = true;       // 关键：开启持续监听，支持2~3分钟长发言
-                    recognition.interimResults = true;    // 实时流式更新
+                    recognition.continuous = true;
+                    recognition.interimResults = true;
 
                     recognition.onresult = (event) => {
                         let transcript = '';
@@ -787,7 +1232,6 @@ HTML_UI = r"""<!DOCTYPE html>
                         }
                         document.getElementById('input_text').value = transcript;
 
-                        // 第三层智能停顿探测：若对方发言完毕停顿超 4.5 秒，自动停止并执行分析
                         if (silenceTimer) clearTimeout(silenceTimer);
                         silenceTimer = setTimeout(() => {
                             if (isListening && document.getElementById('input_text').value.trim().length >= 6) {
@@ -810,7 +1254,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 }
 
                 recognition.lang = document.getElementById('voice_lang').value;
-                document.getElementById('input_text').value = ""; // 清空上一轮残留文本
+                document.getElementById('input_text').value = "";
                 recognition.start();
                 isListening = true;
                 const micBtn = document.getElementById('mic_btn');
@@ -915,7 +1359,7 @@ HTML_UI = r"""<!DOCTYPE html>
 
                 document.getElementById('audit_view').innerHTML = auditMsg;
 
-                const badgeColor = t.risk_level === 'SAFE' ? '#10b981' : (t.risk_level === 'LOW' ? '#f59e0b' : '#ef4444');
+                const badgeColor = t.risk_level === 'SAFE' ? '#059669' : (t.risk_level === 'LOW' ? '#d97706' : '#dc2626');
                 const riskMapZh = {
                     'CRITICAL': '【严重预警 · 突破底线】',
                     'MEDIUM': '【中度博弈 · 存在诱导】',
@@ -924,8 +1368,9 @@ HTML_UI = r"""<!DOCTYPE html>
                 };
                 const riskBadgeText = currentLang === 'zh' ? (riskMapZh[t.risk_level] || t.risk_level) : `[${t.risk_level}]`;
 
-                document.getElementById('trap_title').style.color = badgeColor;
-                document.getElementById('trap_title').innerText = `${riskBadgeText} ${t.trap_or_intent}`;
+                const trapTitleElem = document.getElementById('trap_title');
+                trapTitleElem.style.color = badgeColor;
+                trapTitleElem.innerText = `${riskBadgeText} ${t.trap_or_intent}`;
                 document.getElementById('rule_cited').innerText = (currentLang === 'zh' ? '⚖️ 关联底线与原则锚定：' : '⚖️ Grounded Rule & BATNA: ') + t.triggered_rule;
 
                 document.getElementById('facts_box').innerText = t.box1_text;
