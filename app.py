@@ -35,7 +35,7 @@ def server_fallback_redact(text: str) -> dict:
         '[COMPANY_ENTITY]',
         redacted
     )
-    count = len(re.findall(r'\[(?:REDACTED_\w+|COMPANY_ENTITY)\]', redacted))
+    count = len(re.findall(r'\[(?:REDACTED_\w+\vert{}COMPANY_ENTITY)\]', redacted))
     return {"sanitized_text": redacted, "redaction_count": count}
 
 def discover_available_flash_model(api_key: str) -> str:
@@ -57,7 +57,6 @@ def discover_available_flash_model(api_key: str) -> str:
         methods = m.get("supportedGenerationMethods", [])
         if "generateContent" in methods and "flash" in name.lower() and "2.0-flash" not in name.lower() and "2.5-flash" not in name.lower():
             flash_candidates.append(name)
-    # 优先选择轻量且高速的 flash 模型
     for preferred in flash_candidates:
         if "flash-lite" in preferred:
             return preferred
@@ -1023,8 +1022,8 @@ HTML_UI = r"""<!DOCTYPE html>
                             </tr>
                             <tr>
                                 <td><strong>v3.2 → v4.6</strong></td>
-                                <td>盲打暗号在无触觉屏幕上极不实用，容易被判定为残缺噪音；20秒硬切断会丢失重要施压信息。</td>
-                                <td><strong>彻底去除鸡肋的盲打暗号模式</strong>，纯粹聚焦于硬件降噪流式语音捕获（支持2~3分钟长发言与4.5秒自然停顿检测）；后端注入贝叶斯语义纠偏，模型升级为极速高可用的 <code>gemini-3.5-flash-lite</code>。</td>
+                                <td>长篇发言转写时前半句被索引覆盖丢弃；暗号盲打在触摸屏上极不实用。</td>
+                                <td><strong>彻底修复 Web Speech API 全量结果分块拼接 Bug（由 0 索引全量累加）</strong>；移除鸡肋暗号模式，聚焦硬件降噪流式语音捕获（支持2~3分钟长发言与4.5秒自然停顿检测）；后端升级为极速 <code>gemini-3.5-flash-lite</code>。</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1052,8 +1051,8 @@ HTML_UI = r"""<!DOCTYPE html>
                             </tr>
                             <tr>
                                 <td><strong>v3.2 → v4.6</strong></td>
-                                <td>Under-the-table shorthand created physical friction and was misidentified as fragmented noise; rigid timers cut off long speeches.</td>
-                                <td><strong>Completely eliminated unrealistic shorthand typing</strong> in favor of pure noise-suppressed continuous STT (multi-minute capture & 4.5s natural pause detection); added Bayesian semantic repair and upgraded to <code>gemini-3.5-flash-lite</code>.</td>
+                                <td>Prior speech chunks overwritten by resultIndex reset; shorthand created physical friction on touchscreens.</td>
+                                <td><strong>Completely fixed Web Speech API chunk aggregation bug (accumulating from index 0 across all chunks)</strong>; removed shorthand mode in favor of noise-suppressed continuous STT and migrated to <code>gemini-3.5-flash-lite</code>.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1182,6 +1181,7 @@ HTML_UI = r"""<!DOCTYPE html>
         let recognition = null;
         let isListening = false;
 
+        // 彻底修复长语音转写：从第 0 个分块开始全量拼接，杜绝覆盖前半截文本
         async function toggleMic() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
@@ -1190,6 +1190,10 @@ HTML_UI = r"""<!DOCTYPE html>
             }
 
             if (!isListening) {
+                // 1. 先清空输入框并重置识别器
+                document.getElementById('input_text').value = "";
+                
+                // 2. 激活声卡硬件降噪
                 try {
                     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                         audioStream = await navigator.mediaDevices.getUserMedia({
@@ -1209,13 +1213,15 @@ HTML_UI = r"""<!DOCTYPE html>
                     recognition.continuous = true;
                     recognition.interimResults = true;
 
+                    // 关键修复：从 i = 0 全量累加所有分块，绝对不再漏掉前面的句子！
                     recognition.onresult = (event) => {
-                        let transcript = '';
-                        for (let i = event.resultIndex; i < event.results.length; ++i) {
-                            transcript += event.results[i][0].transcript;
+                        let fullTranscript = '';
+                        for (let i = 0; i < event.results.length; ++i) {
+                            fullTranscript += event.results[i][0].transcript;
                         }
-                        document.getElementById('input_text').value = transcript;
+                        document.getElementById('input_text').value = fullTranscript;
 
+                        // 智能停顿探测：4.5秒自然停顿后自动分析
                         if (silenceTimer) clearTimeout(silenceTimer);
                         silenceTimer = setTimeout(() => {
                             if (isListening && document.getElementById('input_text').value.trim().length >= 6) {
@@ -1238,12 +1244,11 @@ HTML_UI = r"""<!DOCTYPE html>
                 }
 
                 recognition.lang = document.getElementById('voice_lang').value;
-                document.getElementById('input_text').value = "";
                 recognition.start();
                 isListening = true;
                 const micBtn = document.getElementById('mic_btn');
                 micBtn.className = 'mic-btn active';
-                micBtn.innerText = currentLang === 'zh' ? "🛑 正在倾听对方发言 (对方讲完点击停止或停顿4.5秒自动分析)" : "🛑 Listening (Click to stop or pause 4.5s)...";
+                micBtn.innerText = currentLang === 'zh' ? "🛑 正在倾听对方发言 (讲完请点击停止或停顿4.5秒自动分析)" : "🛑 Listening (Click to stop or pause 4.5s)...";
 
             } else {
                 stopMicInternal();
