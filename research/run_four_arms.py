@@ -18,19 +18,23 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from dealguard import check_deal
 from evidence_hybrid import audit_extraction,to_prediction
+from run_gemini_baseline import classify as proven_gemini_baseline
 
 RULE_NAMES=("maximum_discount_pct","payment_days","no_exclusivity")
 RISK_NAMES=("long_receivables","short_payables","unlimited_liability","auto_renewal","termination_penalty")
 MODEL_PROMPT=(
-    "You are an independent commercial-rules evaluation baseline. "
-    "Decide PASS, VIOLATION, or UNKNOWN for each configured rule. "
-    "No other rule may be added. UNKNOWN means no confirmed actionable information. "
-    "Previously proposed, rejected, and withdrawn terms are not current commitments. "
-    "For seller receivables over 60 days report long_receivables; for buyer payables "
-    "shorter than 15 days report short_payables. Separately report active current "
-    "unlimited_liability, auto_renewal, and termination_penalty clauses, not removed ones. "
-    "Return ONLY JSON with predicted_rule_status and predicted_commercial_risks."
-)
+        "You are a rule-auditing comparison baseline. You are NOT given the "
+        "DealGuard algorithm or its predictions. Given ONLY explicit deal rules "
+        "and proposal, for each configured rule decide VIOLATION, PASS or UNKNOWN. "
+        "Do not presume any unstated contractual terms. Detect business review "
+        "flags separately (long_receivables, short_payables, unlimited_liability, "
+        "auto_renewal, termination_penalty). Only evaluate rules actually configured. "
+        "A rejected or historical term is not a current binding deal term. "
+        "Return JSON with exactly two keys: predicted_rule_status (a map with keys "
+        "maximum_discount_pct, payment_days, no_exclusivity as applicable and "
+        "values VIOLATION/PASS/UNKNOWN) and predicted_commercial_risks (an array of "
+        "codes). No explanations."
+    )
 EXTRACTION_PROMPT=(
     "You are a source-grounded information extractor, NOT a decision maker or legal advisor. "
     "Do not decide rule compliance. Do not access or infer expected answers. "
@@ -144,7 +148,7 @@ def _openai_direct(case, key, model):
 
 def _predict(case,mode,gemini_key,openai_key,gemini_model,gpt_model):
     if mode=="gemini":
-        return _gemini_direct(case,gemini_key,gemini_model)
+        return proven_gemini_baseline(case,gemini_key,gemini_model)
     if mode=="gpt":
         return _openai_direct(case,openai_key,gpt_model)
     if mode=="rules":
@@ -174,9 +178,9 @@ def run(cases,mode,output,model,keys,delay=6):
                                 keys["gemini_model"],keys["gpt_model"])
                 break
             except urllib.error.HTTPError as error:
-                if error.code==429 and attempt<4:
+                if error.code in (429,500,502,503,504) and attempt<4:
                     pause=min(120,25*2**attempt)
-                    print(case["id"],mode,"HTTP 429; backoff",pause,"seconds",flush=True)
+                    print(case["id"],mode,"HTTP",error.code,"transient API response; backoff",pause,"seconds",flush=True)
                     time.sleep(pause)
                     continue
                 # Never print Google/OpenAI response body or Authorization header.
