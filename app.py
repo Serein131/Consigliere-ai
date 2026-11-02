@@ -917,6 +917,36 @@ HTML_UI = r"""<!DOCTYPE html>
         .dg-result-mode{font-size:11px;color:#64748b;margin:0 0 10px}
         .dg-actions .dg-primary[disabled],.dg-actions .dg-secondary[disabled]{opacity:.55;cursor:not-allowed}
         @media(max-width:680px){.dg-term-grid{grid-template-columns:1fr}.dg-meta-line{flex-wrap:wrap}}
+        .workflow-navigation{margin-top:18px}
+        .workflow-navigation .card-title{margin-bottom:4px;font-size:18px}
+        .stage-intro{font-size:12.5px;color:#64748b;line-height:1.6;margin:7px 0 12px}
+        .stage-pane .card{margin-top:16px}
+        .stage-pane .dg-panel{margin-top:16px}
+        .stage-workspace{border:1px solid #b9d6da}
+        .voice-panel{margin-top:16px;padding:14px;background:#f8fafc;border:1px solid #dce8f0;border-radius:12px}
+        .voice-panel .stage-intro{margin-bottom:0}
+        .voice-header{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
+        .voice-header label{margin:0}
+        .voice-header select{width:auto;min-width:220px;max-width:100%;font-size:13px}
+        .voice-consent,.agent-consent{display:flex;align-items:flex-start;gap:10px;line-height:1.55;
+            font-size:12px;color:#475569;font-weight:500;padding:10px 0;margin:7px 0}
+        .voice-consent input,.agent-consent input{width:19px;height:19px;margin:1px 0 0;flex:0 0 19px;accent-color:#0b6b62}
+        .agent-consent{border-top:1px solid #e2e8f0;margin-top:16px}
+        .voice-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:7px}
+        .voice-actions #mic_btn{width:auto;min-width:210px;margin:0}
+        .voice-status{font-size:12px;color:#0f766e;font-weight:600}
+        #stage_live_audit .dg-output{border-top:1px solid #cde2e1}
+        .phase-tab.active{border-color:#0b6b62;background:#ecfdf7}
+        .phase-tab.active .phase-tab-title{color:#07534e}
+        @media(max-width:680px){
+            .workflow-navigation .phase-tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+            .workflow-navigation .phase-tab{padding:11px 8px}
+            .workflow-navigation .phase-tab-title{font-size:12px}
+            .workflow-navigation .phase-tab-desc{display:none}
+            .voice-header{align-items:stretch}
+            .voice-header select{width:100%}
+            .voice-actions #mic_btn{width:100%}
+        }
 
         @media(max-width:680px){.dg-config{grid-template-columns:1fr 1fr}
           .dg-hero{padding:23px 19px;border-radius:15px}
@@ -1220,8 +1250,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 headline: 'Know your red lines before you make a deal.',
                 hero: 'A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.',
                 chip1:'✓ Explicit rule checks', chip2:'✓ Evidence, not guesswork', chip3:'✓ Unknown ≠ Safe',
-                panel:'01 / Set your deal guardrails', label:'AI + RULES · OPTIONAL',
-                desc:'You control the thresholds. AI mode extracts source quotes for programmatic checking; rules-only remains available.',
+                panel:'Your deal guardrails', label:'SHARED ACROSS ALL STAGES',
+                desc:'Set commercial thresholds once. They carry into Protect and Debrief. Notes are context, not enforced rules.',
                 check:'Rules only · no Gemini', demo:'Load 3-conflict example', pending:'Checking…',
                 notyet:'NOT YET CHECKED', violation:'RULE VIOLATION', unknown:'NEEDS VERIFICATION',
                 pass:'NO DETECTED VIOLATION', checks:'checks', failures:'violations',
@@ -1244,7 +1274,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 sourceNote:'Use fictional examples only. Regex redaction is incomplete.',
                 rejectDemo:'Load rejected-offer example',
                 consent:'I understand that AI mode sends masked text to a Gemini provider and redaction is incomplete; I will use fictional data.',
-                auditStep:'03 / Verify the proposal',hybridButton:'✦ AI extraction + rule audit',
+                auditStep:'Review evidence and rule conflicts',hybridButton:'✦ AI evidence + rule audit',
                 modeHint:'AI mode extracts cited clauses. Rules-only does not call Gemini.',
                 evidenceTitle:'What the AI extracted',
                 evidenceNote:'A quote match proves that literal text appears in your input, not that its interpretation is correct.',
@@ -1258,15 +1288,15 @@ HTML_UI = r"""<!DOCTYPE html>
                 tooLong:'Please shorten the proposal to 3,500 characters.',
                 failedInput:'This check could not complete. You can still use Rules-only.',
                 errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini rate limit or quota reached. Use Rules-only.',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini temporarily unavailable. Use Rules-only.',MODEL_NOT_CONFIGURED:'Gemini not configured on this deployment. Rules-only works.',MODEL_FORMAT_ERROR:'Gemini returned unreadable terms. Use Rules-only.',MODEL_CONFIGURATION_ERROR:'Gemini model configuration needs checking. Rules-only works.',HYBRID_DISABLED:'AI audit is disabled on this deployment. Rules-only still works.',MODEL_CONSENT_REQUIRED:'Confirm AI-processing notice first.',PROPOSAL_TOO_LONG:'Proposal too long.',NO_CHECKS_CONFIGURED:'Configure at least one constraint.',INVALID_RULES:'Review the rule thresholds.',REQUEST_TOO_LARGE:'Request too large.'},
-                copilot:'Use proposal in the three-stage strategy assistant ↓'
+                copilot:'Continue with an optional tactical response ↑'
             },
             zh: {
                 kicker:'FOUNDER DEALGUARD · 创始人交易决策系统',
                 headline:'签约之前，先守住你的交易底线。',
                 hero:'先设定交易底线，再核对 Gemini 提取的原文与程序审计结果；无法确认的条款需要人工复核。',
                 chip1:'✓ 明确规则校验',chip2:'✓ 可核查证据',chip3:'✓ 未知不等于安全',
-                panel:'01 / 设定交易底线',label:'AI＋规则 · 自主选择',
-                desc:'结构化底线由你决定。AI 模式引用原文并用程序核验，仍可选择无需模型的规则检测。',
+                panel:'本次交易底线',label:'三阶段共同使用',
+                desc:'只需设置一次明确底线，谈判中与谈判后沿用；备注只作背景，不是机器强制规则。',
                 check:'仅规则检测 · 无需 Gemini',demo:'加载三项违规示例',pending:'审计中…',
                 notyet:'尚未检查',violation:'发现底线违规',unknown:'需要进一步核实',
                 pass:'未发现规则冲突',checks:'项检查',failures:'项违规',
@@ -1288,7 +1318,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 sourceNote:'仅输入虚构案例。正则脱敏不能确保所有敏感信息已删除。',
                 rejectDemo:'加载已拒绝报价示例',
                 consent:'我理解 AI 模式会把脱敏后的文本发送至 Gemini，脱敏仍可能遗漏信息；我仅使用虚构案例。',
-                auditStep:'03 / 核对条款及证据',hybridButton:'✦ AI 提取证据＋规则核验',
+                auditStep:'核查证据与底线冲突',hybridButton:'✦ AI 提取证据＋规则核验',
                 modeHint:'混合模式会调用 Gemini；仅规则模式不调用大模型。',
                 evidenceTitle:'AI 提取的条款和原文',
                 evidenceNote:'原文匹配仅证明文本存在，不能证明语义、双方角色或条件状态一定正确。',
@@ -1302,7 +1332,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 tooLong:'交易文本不得超过3500字。',
                 failedInput:'本次核验未完成，可改用仅规则检测。',
                 errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini 额度或频率受限，可使用仅规则模式。',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini 暂时不可用，可使用仅规则模式。',MODEL_NOT_CONFIGURED:'当前部署尚未配置 Gemini，仍可使用仅规则模式。',MODEL_FORMAT_ERROR:'Gemini 未返回有效的条款，可使用仅规则模式。',MODEL_CONFIGURATION_ERROR:'Gemini 配置需要检查，仍可使用仅规则模式。',HYBRID_DISABLED:'当前部署已关闭 AI 审计，仍可使用仅规则模式。',MODEL_CONSENT_REQUIRED:'请先同意 AI 文本处理说明。',PROPOSAL_TOO_LONG:'交易文本过长。',NO_CHECKS_CONFIGURED:'请先设定底线。',INVALID_RULES:'请检查底线输入。',REQUEST_TOO_LARGE:'请求内容过长。'},
-                copilot:'将文本带入三阶段谈判助手 ↓'
+                copilot:'继续生成当场应对策略 ↑'
             }
         };
         function getStructuredRules() {
@@ -1674,17 +1704,17 @@ HTML_UI = r"""<!DOCTYPE html>
             }
 
             if (lang === 'zh') {
-                document.getElementById('subtitle_text').innerText = "明确底线 · 审计交易条款 · 选择谈判方案";
-                document.getElementById('sec1_title').innerText = "📂 1. 商业目标与决策偏好";
+                document.getElementById('subtitle_text').innerText = "谈判前准备 · 谈判中守护 · 谈判后复盘";
+                document.getElementById('sec1_title').innerText = "🎯 目标、偏好与风险提醒";
                 document.getElementById('lbl_goal').innerText = "🎯 核心目标、预算与时间线：";
                 document.getElementById('lbl_bottom_line').innerText = "📝 其他交易备注（不自动作为硬规则）：";
                 document.getElementById('lbl_risk').innerText = "🧠 自行填写的决策偏好与提醒：";
-                document.getElementById('sec2_title').innerText = "🛡️ 2. 三阶段交易决策辅助";
-                document.getElementById('tab1_t').innerText = "🕒 阶段1：战前15分钟预警";
+                document.getElementById('sec2_title').innerText = "你的三阶段谈判工作台";
+                document.getElementById('tab1_t').innerText = "01 · Prepare — 谈判前";
                 document.getElementById('tab1_d').innerText = "会议策略准备与提醒文本";
-                document.getElementById('tab2_t').innerText = "⚡ 阶段2：战中无痕交锋";
+                document.getElementById('tab2_t').innerText = "02 · Protect — 谈判中";
                 document.getElementById('tab2_d').innerText = "可选语音转写 / 事实·推断·未知拆解";
-                document.getElementById('tab3_t').innerText = "🎙️ 阶段3：战后60秒复盘";
+                document.getElementById('tab3_t').innerText = "03 · Debrief — 谈判后";
                 document.getElementById('tab3_d').innerText = "口述得失审计、口头让步找补与跟进邮件";
                 document.getElementById('lbl_mode').innerText = "浏览器语音转写（依赖设备及浏览器）：";
                 document.getElementById('opt_lang_en').innerText = "🎙️ 麦克风通道：English (US / Global) + Browser-dependent transcription";
@@ -1696,20 +1726,20 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('btn_copy_draft').innerText = "📋 复制全文/跟进邮件";
                 document.getElementById('btn_mail_client').innerText = "✉️ 唤起本地邮件客户端";
 
-                document.getElementById('sec3_title').innerText = "🔍 3. 技术架构、隐私限制与测试";
-                document.getElementById('privacy_desc').textContent = '使用结构化规则与 AI 建议辅助交易决策。正则脱敏不能确保完全删除敏感信息；语音识别可能依赖浏览器或服务商。须获得必要录音同意，仅使用合成案例演示。';
+                document.getElementById('sec3_title').innerText = "🔍 工作原理、隐私与测试";
+                document.getElementById('privacy_desc').textContent = '本工具仅辅助决策。语音转文字必须主动开启，不会自动触发 AI 分析。浏览器语音识别可能调用外部服务；正则脱敏不完整。仅使用虚构数据并取得适用的录音许可。';
             } else {
-                document.getElementById('subtitle_text').innerText = "Set limits · Verify terms · Explore options";
-                document.getElementById('sec1_title').innerText = "📂 1. Commercial goals and decision preferences";
+                document.getElementById('subtitle_text').innerText = "Prepare · Protect · Debrief";
+                document.getElementById('sec1_title').innerText = "🎯 Goals, preferences and reminders";
                 document.getElementById('lbl_goal').innerText = "🎯 Core Goal, Budget & Timeline:";
                 document.getElementById('lbl_bottom_line').innerText = "📝 Other deal notes (not machine-enforced):";
                 document.getElementById('lbl_risk').innerText = "🧠 User-entered decision preferences and reminders:";
-                document.getElementById('sec2_title').innerText = "🛡️ 2. Three-stage decision support";
-                document.getElementById('tab1_t').innerText = "🕒 Stage 1: T-15m Pre-Deal";
+                document.getElementById('sec2_title').innerText = "Your three-stage negotiation workspace";
+                document.getElementById('tab1_t').innerText = "01 · Prepare — Pre-deal";
                 document.getElementById('tab1_d').innerText = "Strategy preparation and reminder draft";
-                document.getElementById('tab2_t').innerText = "⚡ Stage 2: Live In-Deal";
+                document.getElementById('tab2_t').innerText = "02 · Protect — In-deal";
                 document.getElementById('tab2_d').innerText = "Optional speech transcript and tactical review";
-                document.getElementById('tab3_t').innerText = "🎙️ Stage 3: T+0m Debrief";
+                document.getElementById('tab3_t').innerText = "03 · Debrief — Post-deal";
                 document.getElementById('tab3_d').innerText = "60s Voice Audit vs. Bottom Lines & Follow-Up Email";
                 document.getElementById('lbl_mode').innerText = "Optional speech transcription (browser-dependent):";
                 document.getElementById('opt_lang_en').innerText = "🎙️ English transcription (browser-dependent)";
@@ -1721,10 +1751,31 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('btn_copy_draft').innerText = "📋 Copy Full Draft / Email";
                 document.getElementById('btn_mail_client').innerText = "✉️ Open in Mail Client";
 
-                document.getElementById('sec3_title').innerText = "🔍 3. Architecture, privacy limitations and tests";
-                document.getElementById('privacy_desc').textContent = 'Decision support only. Regex redaction is incomplete; speech recognition may depend on browser/provider services. Obtain applicable recording consent and use synthetic data for demos.';
+                document.getElementById('sec3_title').innerText = "🔍 How it works · Privacy · Tests";
+                document.getElementById('privacy_desc').textContent = 'Decision support only. Transcript capture is user-initiated and does not auto-start AI inference. Browser speech recognition may rely on third parties. Regex redaction is incomplete; use fictional data and obtain applicable recording consent.';
             }
 
+            document.getElementById('workflow_intro').textContent=lang==='zh'
+                ?'一组共享底线 · 一个输入框 · 每次 AI 调用由你决定'
+                :'One set of guardrails · One input · Every AI call is your choice.';
+            document.getElementById('dg_live_label').textContent=lang==='zh'
+                ?'证据 → 底线 → 策略':'EVIDENCE → RULES → ACTION';
+            document.getElementById('dg_audit_intro').textContent=lang==='zh'
+                ?'使用上方同一份文本核验，自动沿用谈判前设定的底线。'
+                :'Audit the same text above, with the Stage 1 thresholds automatically reused.';
+            document.getElementById('mic_consent_text').textContent=lang==='zh'
+                ?'我已获得适用的语音转写许可，理解浏览器语音识别可能由第三方处理。'
+                :'I have permission to transcribe this conversation. Browser speech recognition may use third-party services.';
+            document.getElementById('mic_hint').textContent=lang==='zh'
+                ?'语音仅转为文字，随时可以停止；停顿或停止不会自动调用 Gemini。'
+                :'Speech is converted to text only. Pause or stop anytime; no AI call happens automatically.';
+            document.getElementById('agent_consent_text').textContent=lang==='zh'
+                ?'我同意将脱敏后的虚构阶段文本及决策背景发送至 AI 策略服务（脱敏不保证完整）。'
+                :'I consent to sending masked fictional stage notes and decision context to the AI strategy provider; masking is incomplete.';
+            document.getElementById('lbl_mode').textContent=lang==='zh'
+                ?'可选语音转文字（依赖浏览器支持）':'Optional speech-to-text (browser dependent)';
+            document.getElementById('dg_source_note').textContent=lang==='zh'
+                ?'仅使用虚构案例，正则脱敏不能保证隐私安全。':'Fictional examples only; regex redaction cannot guarantee confidentiality.';
             updatePillarHeaders();
             updateSessionUI();
             // New workflow has only one editor; never auto-load an example on language changes.
