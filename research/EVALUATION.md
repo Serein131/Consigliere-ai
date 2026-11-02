@@ -4,11 +4,11 @@
 
 Consigliere AI is an early **decision-support prototype**, not autonomous deal execution, legal counsel, or a certified risk evaluation tool. Experiments test synthetic language and explicit user-configured constraint handling, not contract enforceability or business outcome quality.
 
-## Four arms
+## Three evaluated systems (optional fourth arm archived)
 
 **A · Gemini:** Gemini API directly classifies PASS, VIOLATION or UNKNOWN and commercial-review flags, with no DealGuard outputs.
 
-**B · GPT:** OpenAI Responses API model (default `gpt-6-luna`) receives the **same rule-classification prompt and inputs as Gemini**, no DealGuard outputs. OpenAI API usage is separate from a ChatGPT subscription.
+**B · GPT (archived, not evaluated):** A parallel OpenAI Responses API baseline was implemented, but the real request failed with exhausted API credits and produced zero usable predictions. The project owner elected not to fund further requests. This is not part of the active three-system study or any accuracy comparison.
 
 **C · Deterministic:** Existing `dealguard.py` applies regex-based extraction and explicit rule comparison. This is intentionally unchanged during the experiment.
 
@@ -16,7 +16,7 @@ Consigliere AI is an early **decision-support prototype**, not autonomous deal e
 
 ## Data
 
-[Dataset catalog](cases/README.md). In particular, the four-arm dataset [four_arm_frozen_24.json](cases/four_arm_frozen_24.json) contains 24 synthetic bilingual cases. Labels were authored before running any of the four arms, but there was no independent legal, procurement or commercial expert adjudication.
+[Dataset catalog](cases/README.md). In particular, the original four-arm-labeled dataset [four_arm_frozen_24.json](cases/four_arm_frozen_24.json) contains 24 synthetic bilingual cases. Labels were authored before running the measured A/C/D experiments, but there was no independent legal, procurement or commercial expert adjudication.
 
 ## Running locally (for a technical reviewer)
 
@@ -29,14 +29,12 @@ For API-based models, configure environment secrets **outside version control**.
 
 ```bash
 export GEMINI_API_KEY="<from Google AI Studio>"
-export OPENAI_API_KEY="<from OpenAI platform>"
 python research/run_four_arms.py --cases research/cases/four_arm_frozen_24.json --arm gemini --output /tmp/arms/gemini.json
-python research/run_four_arms.py --cases research/cases/four_arm_frozen_24.json --arm gpt --output /tmp/arms/gpt.json
 python research/run_four_arms.py --cases research/cases/four_arm_frozen_24.json --arm hybrid --output /tmp/arms/hybrid.json
 python research/evaluate_four_arms.py --cases research/cases/four_arm_frozen_24.json --results-dir /tmp/arms --output-prefix /tmp/four_arm
 ```
 
-In GitHub Actions, use **Secrets**, not public repository variables. `GEMINI_API_KEY` is previously configured. `OPENAI_API_KEY` requires independent authorization and billing. If that secret is missing, the workflow must publish results for actual completed groups and mark GPT **NOT_RUN**.
+In GitHub Actions, use **Secrets**, not public repository variables. Gemini was already measured with a user-configured key. The optional OpenAI experiment remains **NOT_RUN** because there are no valid predictions, not because the model performed poorly. **No additional API payment is required** for the three-system study.
 
 ## Technical evaluation
 

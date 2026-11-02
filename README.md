@@ -34,14 +34,15 @@ User-defined goals + structured deal rules
 
 The current regex-based engine matched **60/60 familiar development examples** after targeted fixes, but only **16/40 new difficult synthetic cases**, while a plain Gemini API benchmark matched **31/40** on those same new cases. The result exposes a generalization problem and motivates the hybrid architecture.
 
-These are fictional AI-assisted scenarios with **non-independent labels**. They are *not* validated contract accuracy or proof that one provider universally wins. A new [24-case four-arm experimental framework](research/FOUR_ARM_RESULTS.md) has **three actually completed groups**. In two identical-data runs, Gemini scored **21/24 then 22/24**, deterministic DealGuard **11/24**, and evidence-grounded hybrid **22/24** against authored labels. The OpenAI GPT key is now configured, but **GPT is still NOT_RUN** because the API returned `credit_balance_exhausted` (zero successful predictions). Once credits are available, a [GPT-only workflow](.github/workflows/gpt-only-completion.yml) can complete the fourth group without repeating Gemini. The hybrid is research code, not a deployed release. The synthetic test scores are not expert-validated accuracy or proof of one provider's superiority.
+These are fictional, AI-assisted scenarios with **non-independent labels**, not verified contract accuracy. The **[three-system experiment](research/THREE_SYSTEM_RESULTS.md)** compared Gemini directly, deterministic DealGuard, and the evidence-grounded hybrid on 24 frozen synthetic cases. Across two runs, Gemini scored **21/24 then 22/24**, DealGuard **11/24**, and the hybrid **22/24 in both**. The initial one-case hybrid advantage disappeared on repetition. An optional GPT comparison was attempted but produced **zero valid predictions** because the OpenAI API balance was exhausted; it has been **dropped from the active research scope**, with the failed attempt preserved for transparency. No payment or GPT experiment is required. The hybrid remains research code, not a deployed feature.
 
 ## Repository guide
 
 | Entry | Purpose |
 |---|---|
 | [research/BENCHMARK.md](research/BENCHMARK.md) | Research overview, historical reversals and study design |
-| [research/FOUR_ARM_RESULTS.md](research/FOUR_ARM_RESULTS.md) | **Latest actual three completed groups**, GPT marked NOT_RUN, full case failures |
+| [research/THREE_SYSTEM_RESULTS.md](research/THREE_SYSTEM_RESULTS.md) | **Main three-system study**, results, replication and limits |
+| [research/FOUR_ARM_RESULTS.md](research/FOUR_ARM_RESULTS.md) | Detailed historical four-arm attempt, including the uncompleted GPT group |
 | [research/EVALUATION.md](research/EVALUATION.md) | Scoring rules, reproducibility and four-arm methodology |
 | [research/cases/](research/cases/) | Synthetic case catalog (familiar, challenging, frozen) |
 | [research/user_test_protocol.md](research/user_test_protocol.md) | Consent-based 5–8 minute usability test plan |

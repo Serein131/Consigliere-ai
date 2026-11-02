@@ -1,6 +1,6 @@
-# Run four research arms safely on an iPad
+# Archived optional GPT arm setup — not required for current study
 
-The GitHub workflow [Four-Arm Evidence-Grounded Negotiation Study](https://github.com/Serein131/Consigliere-ai/actions/workflows/four-arm-research.yml) runs the *actual* model endpoints on fictional synthetic case texts. No client contracts or actual negotiation files are needed.
+The owner decided **not to purchase additional OpenAI API credits**, so this is **archival documentation only**, not a current checklist. The active research uses the three completed systems A/Gemini, C/DealGuard and D/hybrid. See [three-system results](THREE_SYSTEM_RESULTS.md). Nothing here requires action or payment.
 
 ## What already exists
 
@@ -8,18 +8,18 @@ The GitHub workflow [Four-Arm Evidence-Grounded Negotiation Study](https://githu
 - `OPENAI_API_KEY`: **now present in GitHub Secrets**, but the real inference request returned HTTP 429 with `credit_balance_exhausted`, confirmed by [one safe diagnostic run](https://github.com/Serein131/Consigliere-ai/actions/runs/41427929940). A key alone does not fund OpenAI Platform usage. Do not send a key through ChatGPT.
 - Arm C is a deterministic Python program and needs no provider key.
 
-## Current action: verify API billing before retrying
+## Optional historical procedure (not requested and not necessary)
 
-1. Open [OpenAI Platform Billing](https://platform.openai.com/settings/organization/billing/overview) and check your **prepaid API credit balance** and payment status. The ChatGPT Plus subscription does not supply API credits.
+1. *Only if voluntarily revisiting this work later:* open [OpenAI Platform Billing](https://platform.openai.com/settings/organization/billing/overview) and check your **prepaid API credit balance** and payment status. The ChatGPT Plus subscription does not supply API credits.
 2. If the balance is exhausted, add an amount you approve (billing costs are under your control). Confirm the payment/credit balance appears before starting the experiment.
-3. Check [organization/project limits](https://platform.openai.com/settings/organization/limits) if billing has a positive balance but quota errors persist.
-4. To avoid rerunning A/C/D, launch **[GPT-only completion](https://github.com/Serein131/Consigliere-ai/actions/workflows/gpt-only-completion.yml)**, choose `main`, then **Run workflow**. It imports the exact prior 24-case A/C/D predictions from GitHub Actions artifact `13132523079` and calls **only GPT**.
+3. Only if independently needed, check [organization/project limits](https://platform.openai.com/settings/organization/limits) if billing has a positive balance but quota errors persist.
+4. If independently authorized and funded later, to avoid rerunning A/C/D launch **[GPT-only completion](https://github.com/Serein131/Consigliere-ai/actions/workflows/gpt-only-completion.yml)**, choose `main`, then **Run workflow**. It imports the exact prior 24-case A/C/D predictions from GitHub Actions artifact `13132523079` and calls **only GPT**.
 5. Do not repeat the first failed run just to test whether credits exist: its job already attempted the API repeatedly. The billing-aware runner now exits immediately on credit exhaustion.
 6. If the saved GitHub artifact expires (30 days), the GPT-only workflow cannot reuse it; instead run the full four-arm workflow after credits are available.
 
 **Do not send your API key or payment details into this chat, a GitHub issue, or the public repository.**
 
-## Configure GPT experiment (user-owned credentials)
+## Original GPT setup instructions (archived)
 
 1. Visit [OpenAI Platform API Keys](https://platform.openai.com/api-keys), create an API key in an account/project with API access and suitable spend controls.
 2. Open [GitHub Actions Secrets](https://github.com/Serein131/Consigliere-ai/settings/secrets/actions); sign in with the repository owner's account.
