@@ -1,0 +1,42 @@
+name: Hybrid V5.2 Real Gemini Smoke Test
+on:
+  push:
+    branches: [feature/hybrid-product-v52-20261102]
+    paths: ['.github/workflows/hybrid-live-smoke.yml']
+permissions:
+  contents: read
+jobs:
+  one-fictional-case:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: gemini-3.5-flash-lite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: One real hybrid API call with fictional terms only
+        run: |
+          python - <<'PY'
+          import os
+          from hybrid_service import execute_hybrid,HybridError
+          key=(os.environ.get('GEMINI_API_KEY') or '').strip()
+          if not key:
+              raise SystemExit('Gemini secret missing; live smoke was NOT executed')
+          text='The buyer requests a 15% discount, payment terms 90 days, and an exclusivity agreement.'
+          rules={'role':'seller','discount_max_pct':10,'payment_direction':'maximum',
+                 'payment_days':45,'prohibit_exclusivity':True}
+          report=execute_hybrid(text,rules,key,model='gemini-3.5-flash-lite')
+          audit=report['audit']
+          if audit['configured_checks']!=3 or len(report['extraction']['terms'])!=3:
+              raise SystemExit('Hybrid response missing configured checks')
+          for term in report['extraction']['terms']:
+              if term['quote_verified'] and term['evidence'] not in text:
+                  raise SystemExit('Returned unverified quotation')
+          print('LIVE_HYBRID_SUCCESS; checks=',audit['configured_checks'],
+                'violations=',audit['violation_count'],
+                'assessment=',audit['assessment'],
+                'evidence_quotes=',sum(int(t['quote_verified']) for t in report['extraction']['terms']))
+          PY
