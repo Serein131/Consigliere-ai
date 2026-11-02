@@ -35,6 +35,12 @@ Regex redaction is incomplete; app/server/provider data-retention rules are not 
 
 ## Research and evaluation
 
+**Latest validation (2026-11-02):** On **40 newly frozen complex synthetic cases** not previously used to tune the deterministic parser, plain Gemini matched 31/40 cases against authored labels, versus 16/40 for DealGuard. On a separate 20-case previously inspected challenge set, the comparison was 13/20 versus 3/20. This reverses the familiar 60-case regression result and reveals substantial parsing brittleness. These examples remain AI-authored and not independently expert-labeled; they are not production accuracy estimates.
+
+- [LATEST: Frozen 40-case paired study plus separate difficult 20-case results](research/HOLDOUT_RESULTS_2026-11-02.md)
+- [Frozen holdout protocol and freeze record](research/HELDOUT_PROTOCOL_2026-11-02.md)
+- [Inspect 40 new cases and authored expected labels](research/frozen_holdout_v1.json)
+
 - [Measured synthetic test results](research/RESULTS.md)
 - [Actual 60-case Gemini comparison: results, error analysis, and critical caveats](research/GEMINI_COMPARISON_2026-11-02.md)
 - [Experiment methods](research/EXPERIMENT.md)
@@ -43,7 +49,7 @@ Regex redaction is incomplete; app/server/provider data-retention rules are not 
 - [Standard cases](research/synthetic_cases.json)
 - [Harder challenge cases](research/challenge_cases.json)
 
-The fixtures are synthetic and are not production accuracy evidence. The Gemini comparison and live user recruitment remain future work.
+All benchmark cases are synthetic; neither result demonstrates real-contract accuracy. The actual Gemini comparisons have been executed and recorded. Independent human or domain-expert feedback remains outstanding.
 
 ## Portfolio
 
