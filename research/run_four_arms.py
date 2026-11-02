@@ -178,12 +178,33 @@ def run(cases,mode,output,model,keys,delay=6):
                                 keys["gemini_model"],keys["gpt_model"])
                 break
             except urllib.error.HTTPError as error:
+                # Only inspect a fixed list of provider error codes. Do not log
+                # raw response content, request headers, credentials or account data.
+                billing_codes={
+                    "credit_balance_exhausted","organization_usage_limit_exceeded",
+                    "organization_spend_limit_exceeded","project_spend_limit_exceeded",
+                    "insufficient_quota"
+                }
+                err_code="UNKNOWN"
+                err_type="UNKNOWN"
+                if mode=="gpt":
+                    try:
+                        data=json.loads(error.read(12000).decode("utf-8")).get("error",{})
+                        err_code=str(data.get("code") or "UNKNOWN")
+                        err_type=str(data.get("type") or "UNKNOWN")
+                    except (ValueError,UnicodeError,TypeError,AttributeError):
+                        pass
+                    if err_code in billing_codes or err_type=="insufficient_quota":
+                        safe_code=err_code if err_code in billing_codes else "insufficient_quota"
+                        print(case["id"],"gpt","BLOCKED_BILLING",safe_code,
+                              "do not retry until the API balance or limit is resolved",flush=True)
+                        break
                 if error.code in (429,500,502,503,504) and attempt<4:
                     pause=min(120,25*2**attempt)
-                    print(case["id"],mode,"HTTP",error.code,"transient API response; backoff",pause,"seconds",flush=True)
+                    print(case["id"],mode,"HTTP",error.code,
+                          "temporary provider limit; backoff",pause,"seconds",flush=True)
                     time.sleep(pause)
                     continue
-                # Never print Google/OpenAI response body or Authorization header.
                 print(case["id"],mode,"HTTP",error.code,"request failed",flush=True)
                 break
             except (urllib.error.URLError,ValueError,KeyError,IndexError,TimeoutError,TypeError) as error:
