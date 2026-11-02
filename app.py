@@ -312,7 +312,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v5.0 | Founder DealGuard — Auditable Decision Intelligence</title>
+    <title>Consigliere AI v5.1 | Founder DealGuard — Auditable Decision Intelligence</title>
     <style>
         :root {
             --bg-canvas: #f8fafc;
@@ -845,7 +845,12 @@ HTML_UI = r"""<!DOCTYPE html>
         .dg-finding-state.violation{color:#b91c1c}.dg-finding-state.unknown{color:#a16207}.dg-finding-state.pass{color:#047857}
         .dg-finding-evidence{font-size:11px;color:#475569;line-height:1.55;margin-top:6px;overflow-wrap:anywhere}
         .dg-footnote{font-size:11px;color:#64748b;margin-top:12px;line-height:1.6}
-        @media(max-width:680px){
+        .dg-config{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin:14px 0}
+        .dg-config label{margin:0 0 5px;font-size:12px}.dg-config select,.dg-config input:not([type=checkbox]){padding:9px 10px;font-size:13px}
+        .dg-config input[type=checkbox]{width:22px;height:22px}
+        .dg-notice{font-size:12px;color:#64748b}.dg-risk{padding:12px;margin-top:12px;border:1px solid #f3d5a7;border-radius:12px;background:#fffbeb}
+        .dg-risk strong{color:#92400e;font-size:13px}.dg-risk p{font-size:12px;margin:6px 0;color:#78350f}
+        @media(max-width:680px){.dg-config{grid-template-columns:1fr 1fr}
           .dg-hero{padding:23px 19px;border-radius:15px}
           .dg-panel{padding:18px 16px}
           .dg-findings{grid-template-columns:1fr}
@@ -856,8 +861,8 @@ HTML_UI = r"""<!DOCTYPE html>
 <body>
     <div class="header-row">
         <div>
-            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.0 · Founder DealGuard</span></div>
-            <div class="subtitle" id="subtitle_text">Solving Recording Dilemma: T-15m Wargame • Noise-Suppressed In-Deal • T+0m Debrief</div>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.1 · Founder DealGuard</span></div>
+            <div class="subtitle" id="subtitle_text">Set limits · Verify terms · Explore options</div>
         </div>
         <div class="lang-switch">
             <button type="button" class="lang-btn" id="btn_en" onclick="setLanguage('en')">🇺🇸 English</button>
@@ -884,6 +889,14 @@ HTML_UI = r"""<!DOCTYPE html>
             <span class="dg-label" id="dg_no_llm">NO GEMINI CALL REQUIRED</span>
         </div>
         <p id="dg_panel_desc">Uses your Hard Bottom Lines and the proposal text below. Detects explicit discount, payment-window, and exclusivity rule conflicts. The rules are inspectable and conservative.</p>
+        <div class="dg-config">
+            <div><label for="dg_role" id="dg_role_label">Deal perspective</label><select id="dg_role"><option value="seller">Seller · getting paid</option><option value="buyer">Buyer · paying</option><option value="unspecified">Unspecified</option></select></div>
+            <div><label for="dg_discount" id="dg_discount_label">Maximum discount (%)</label><input type="number" id="dg_discount" min="0" max="100" value="10"></div>
+            <div><label for="dg_pay_dir" id="dg_pay_label">Payment term rule</label><select id="dg_pay_dir"><option value="maximum">At most (days)</option><option value="minimum">At least (days)</option><option value="none">No payment rule</option></select></div>
+            <div><label for="dg_pay_days" id="dg_days_label">Payment days threshold</label><input type="number" id="dg_pay_days" min="0" max="3650" value="45"></div>
+            <div><label for="dg_no_exclusive" id="dg_exclusive_label">Prohibit exclusivity</label><input type="checkbox" id="dg_no_exclusive" checked></div>
+        </div>
+        <p class="dg-notice" id="dg_config_note">Structured thresholds control the audit. Free-text notes below provide context but do not create additional enforced rules.</p>
         <div class="dg-actions">
             <button type="button" class="dg-primary" onclick="runDealGuardAudit()" id="dg_check_btn">◆ Check deal constraints</button>
             <button type="button" class="dg-secondary" onclick="loadDealGuardDemo()" id="dg_demo_btn">Load 3-rule stress test</button>
@@ -894,6 +907,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 <span class="dg-count" id="dg_counter"></span>
             </div>
             <div class="dg-findings" id="dg_findings"></div>
+            <div class="dg-risk" id="dg_risk" style="display:none"><strong id="dg_risk_title">Commercial risk review — separate from rules</strong><div id="dg_risk_findings"></div></div>
+            <div id="dg_rule_warnings" class="dg-footnote"></div>
             <div class="dg-footnote" id="dg_footnote">A rule audit cannot certify contractual safety or replace qualified legal and financial review.</div>
         </div>
     </section>
@@ -911,8 +926,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 <input id="hard_bottom_line" value="Payment terms >= 45 days; max discount <= 10%; zero exclusive lock-in clauses." />
             </div>
         </div>
-        <label id="lbl_risk">🧠 Historical Commitments & Behavioral Vulnerability Profile:</label>
-        <input id="risk_preference" value="Relationship-focused; prone to anxiety and premature concessions when hit with artificial deadlines (Ultimatum Game) or future volume bait (Cheap Talk)." />
+        <label id="lbl_risk">📝 User-entered decision preferences & reminders:</label>
+        <input id="risk_preference" value="Require written confirmation, time to review, and no unapproved concessions." />
     </div>
 
     <!-- 2. 全周期三阶段切换与输入 -->
@@ -921,11 +936,11 @@ HTML_UI = r"""<!DOCTYPE html>
         <div class="phase-tabs">
             <button type="button" class="phase-tab" id="tab_pre_deal" onclick="setPhase('pre_deal')">
                 <span class="phase-tab-title" id="tab1_t">🕒 Stage 1: T-15m Pre-Deal</span>
-                <span class="phase-tab-desc" id="tab1_d">SMS Wake-Up Alert & Trap Wargaming (70% of Win)</span>
+                <span class="phase-tab-desc" id="tab1_d">Strategy preparation & reminder draft</span>
             </button>
             <button type="button" class="phase-tab active" id="tab_in_deal" onclick="setPhase('in_deal')">
                 <span class="phase-tab-title" id="tab2_t">⚡ Stage 2: Live In-Deal</span>
-                <span class="phase-tab-desc" id="tab2_d">Hardware Noise-Suppressed STT / Tactical Triage</span>
+                <span class="phase-tab-desc" id="tab2_d">Optional speech transcription & tactical review</span>
             </button>
             <button type="button" class="phase-tab" id="tab_post_deal" onclick="setPhase('post_deal')">
                 <span class="phase-tab-title" id="tab3_t">🎙️ Stage 3: T+0m Debrief</span>
@@ -945,10 +960,10 @@ HTML_UI = r"""<!DOCTYPE html>
 
         <div class="preset-row" id="preset_container"></div>
 
-        <label id="lbl_mode">Local Speech Recognition & Microphone Channel:</label>
+        <label id="lbl_mode">Optional speech transcription (browser-dependent):</label>
         <select id="voice_lang">
-            <option value="en-US" id="opt_lang_en">🎙️ Microphone Channel: English (US / Global) + Hardware Noise Suppression</option>
-            <option value="zh-CN" id="opt_lang_zh">🎙️ 麦克风通道：中文 (普通话) + 硬件级声学降噪 DSP</option>
+            <option value="en-US" id="opt_lang_en">🎙️ English transcription (browser-dependent)</option>
+            <option value="zh-CN" id="opt_lang_zh">🎙️ 中文转写（依赖浏览器支持）</option>
         </select>
 
         <label id="lbl_input_text">Stage Input (Meeting Context / Live Opponent Speech / 60s Post-Deal Voice Memo):</label>
@@ -998,9 +1013,9 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <!-- 4. 博弈论内核、隐私边界与工程迭代证据 -->
     <div class="card">
-        <strong class="card-title" id="sec3_title">🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log</strong>
+        <strong class="card-title" id="sec3_title">🔍 3. Architecture, privacy boundaries & tests</strong>
         <p style="font-size:13.5px; color:#64748b; margin:8px 0 14px 0;" id="privacy_desc"></p>
-        <div id="iteration_table_container"></div>
+        <p class="dg-footnote" id="research_note">The deterministic audit and regression tests are in the public repository. Accuracy, latency and retention claims require independent verification.</p><a href="https://github.com/Serein131/Consigliere-ai" target="_blank" rel="noopener noreferrer">Read tests & source</a>
     </div>
 
     <script>
