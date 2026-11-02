@@ -932,6 +932,9 @@ HTML_UI = r"""<!DOCTYPE html>
             font-size:12px;color:#475569;font-weight:500;padding:10px 0;margin:7px 0}
         .voice-consent input,.agent-consent input{width:19px;height:19px;margin:1px 0 0;flex:0 0 19px;accent-color:#0b6b62}
         .agent-consent{border-top:1px solid #e2e8f0;margin-top:16px}
+        .agent-action-panel{margin-top:16px;padding-top:8px;border-top:1px solid #cfe3e4}
+        .agent-action-panel .btn-row{margin-top:4px}
+        .agent-action-panel .dg-action-hint{margin-top:10px}
         .voice-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:7px}
         .voice-actions #mic_btn{width:auto;min-width:210px;margin:0}
         .voice-status{font-size:12px;color:#0f766e;font-weight:600}
@@ -1062,7 +1065,7 @@ HTML_UI = r"""<!DOCTYPE html>
             <span id="dg_chars">0 / 3500</span>
         </div>
         <div class="preset-row" id="preset_container"></div>
-        <div class="voice-panel">
+        <div class="voice-panel" id="voice_panel">
             <div class="voice-header">
                 <label id="lbl_mode" for="voice_lang">Optional speech-to-text (browser-dependent)</label>
                 <select id="voice_lang">
@@ -1080,14 +1083,16 @@ HTML_UI = r"""<!DOCTYPE html>
             </div>
             <p class="stage-intro" id="mic_hint">Transcription is voluntary. Pause or stop at any time; it never automatically starts AI analysis.</p>
         </div>
-        <label class="agent-consent" for="agent_consent">
-            <input id="agent_consent" type="checkbox">
-            <span id="agent_consent_text">I consent to sending sanitized fictional stage notes and decision context to the AI strategy provider.</span>
-        </label>
-        <div class="btn-row">
-            <button type="button" id="run_btn" class="primary" onclick="runAgent()">Generate pre-meeting strategy</button>
+        <div class="agent-action-panel" id="agent_action_panel">
+            <label class="agent-consent" for="agent_consent">
+                <input id="agent_consent" type="checkbox">
+                <span id="agent_consent_text">I consent to sending sanitized fictional stage notes and decision context to the AI strategy provider.</span>
+            </label>
+            <div class="btn-row">
+                <button type="button" id="run_btn" class="primary" onclick="runAgent()">Generate pre-meeting strategy</button>
+            </div>
+            <p class="dg-action-hint" id="agent_mode_note">The strategy assistant uses a separate AI call, only after you press the button.</p>
         </div>
-        <p class="dg-action-hint" id="agent_mode_note">The strategy assistant uses a separate AI call, only after you press the button.</p>
     </section>
 
     <!-- 02 PROTECT: the same input powers rule-only or source-grounded AI audit. -->
@@ -1635,7 +1640,14 @@ HTML_UI = r"""<!DOCTYPE html>
                 else button.removeAttribute('aria-current');
             }
             document.getElementById('stage_prepare').style.display=phase==='pre_deal'?'block':'none';
-            document.getElementById('stage_live_audit').style.display=phase==='in_deal'?'block':'none';
+            const livePanel=document.getElementById('stage_live_audit');
+            const workspace=document.getElementById('stage_input_workspace');
+            livePanel.style.display=phase==='in_deal'?'block':'none';
+            document.getElementById('voice_panel').style.display=phase==='pre_deal'?'none':'block';
+            // Move one actual button group; never render a second strategy control.
+            const actionPanel=document.getElementById('agent_action_panel');
+            if(phase==='in_deal')livePanel.appendChild(actionPanel);
+            else workspace.appendChild(actionPanel);
             document.getElementById('stage_mode_badge').textContent=l.badge;
             document.getElementById('dg_proposal_label').textContent=l.title;
             document.getElementById('stage_hint').textContent=l.hint;
