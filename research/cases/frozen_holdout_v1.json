@@ -1,0 +1,633 @@
+{
+  "dataset_name": "consigliere_dealguard_20261102_frozen_holdout",
+  "created_utc": "2026-11-02",
+  "schema_version": 1,
+  "case_generation": "assistant-authored synthetic new cases; not used to train or edit DealGuard at the time of freeze",
+  "scoring_policy": "Exact match of configured rule states and advisory risk flags. All labels are predeclared, but not independently expert-adjudicated; some cases deliberately ambiguous.",
+  "freeze_rule": "Commit case file before running either system; do not modify cases, labels or DealGuard code after seeing predictions for this evaluation.",
+  "cases": [
+    {
+      "id": "HLD-001",
+      "category": "discount",
+      "language": "en",
+      "proposal": "At signing, our revised offer is a 12 percent reduction in annual licensing fees.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Percent word instead of %; an active offer."
+    },
+    {
+      "id": "HLD-002",
+      "category": "discount",
+      "language": "en",
+      "proposal": "The original document requested a 22% discount, but the countersigned schedule grants a 9% discount.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Countersigned 9% supersedes earlier request."
+    },
+    {
+      "id": "HLD-003",
+      "category": "discount",
+      "language": "en",
+      "proposal": "Sales suggests a 7% discount; procurement still asks for 14% discount. No final rate was selected.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Two unresolved offers; no final amount."
+    },
+    {
+      "id": "HLD-004",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "报价邮件写着：本轮降价12％，月底之前签署即可生效。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Full-width percentage sign."
+    },
+    {
+      "id": "HLD-005",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "采购方此前提出18%折扣，已被明确拒绝；尚未提出新的折扣方案。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Only rejected proposal; no live discount."
+    },
+    {
+      "id": "HLD-006",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "双方已书面确认折扣率为9%，之前讨论的15%折扣方案作废。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Final accepted term precedes historical rejected."
+    },
+    {
+      "id": "HLD-007",
+      "category": "discount",
+      "language": "en",
+      "proposal": "The proposed discount is still TBD, pending approval by the board.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Missing actual value."
+    },
+    {
+      "id": "HLD-008",
+      "category": "discount",
+      "language": "en",
+      "proposal": "The buyer proposes 11.5% off the recurring license, subject to CFO approval.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Above threshold despite conditional signature."
+    },
+    {
+      "id": "HLD-009",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "对方口头提出把服务价格降低12个百分点，但书面报价尚未收到。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Proposed term, written-out unit."
+    },
+    {
+      "id": "HLD-010",
+      "category": "discount",
+      "language": "en",
+      "proposal": "We can only discuss a discount in the meeting; no rate has been quoted.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "No numeric rate."
+    },
+    {
+      "id": "HLD-011",
+      "category": "payment",
+      "language": "en",
+      "proposal": "The latest purchase order says: invoice payable sixty days after acceptance.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Spelled-out days instead of digits."
+    },
+    {
+      "id": "HLD-012",
+      "category": "payment",
+      "language": "en",
+      "proposal": "The agreed net-30 payment term supersedes the draft's net-90 request.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Net 30 supersedes net 90."
+    },
+    {
+      "id": "HLD-013",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Buyer requested 75-day payment terms; seller rejected them, no new dates agreed.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Rejected 75-day term leaves current payment unknown; should not raise an active cashflow risk."
+    },
+    {
+      "id": "HLD-014",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "新订单写明：收到发票后第75日付款。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": "75-day seller receivable warrants a distinct commercial-review flag."
+    },
+    {
+      "id": "HLD-015",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "双方最终确定的付款期限是30天，90天账期方案已撤回。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Final term plus withdrawn draft."
+    },
+    {
+      "id": "HLD-016",
+      "category": "payment",
+      "language": "en",
+      "proposal": "As the buyer, we have negotiated net 60 days, not the supplier's net 15 demand.",
+      "structured_rules": {
+        "role": "buyer",
+        "payment_direction": "minimum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Buyer minimum 45, net 60 passes."
+    },
+    {
+      "id": "HLD-017",
+      "category": "payment",
+      "language": "en",
+      "proposal": "For this purchase, our payable is due 7 days after receipt.",
+      "structured_rules": {
+        "role": "buyer",
+        "payment_direction": "minimum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "short_payables"
+      ],
+      "annotation_note": "Buyer faces short payable."
+    },
+    {
+      "id": "HLD-018",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "作为采购方，供应商要求我们在10天内付款。",
+      "structured_rules": {
+        "role": "buyer",
+        "payment_direction": "minimum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "short_payables"
+      ],
+      "annotation_note": "Short buyer payment term."
+    },
+    {
+      "id": "HLD-019",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "付款期限尚未填写，双方下周再决定。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Missing term."
+    },
+    {
+      "id": "HLD-020",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Payment will be in two installments: half in 10 days, rest in 90 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "No single auditable effective payment period."
+    },
+    {
+      "id": "HLD-021",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "The buyer insists on a 24-month exclusive supply arrangement.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Explicit proposed exclusivity."
+    },
+    {
+      "id": "HLD-022",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "The parties expressly agree there will be no exclusive rights.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Prohibition explicitly honored."
+    },
+    {
+      "id": "HLD-023",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "The old draft included exclusivity, but the signed revision removed the clause.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Deleted exclusivity cannot be counted as current."
+    },
+    {
+      "id": "HLD-024",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "Exclusivity is a possible option and has not yet been proposed formally.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Conditional speculative clause."
+    },
+    {
+      "id": "HLD-025",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "对方要求我们在东南亚市场给予独家销售权。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Chinese license exclusivity."
+    },
+    {
+      "id": "HLD-026",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "已经确认合同不包含任何排他性安排。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "No exclusivity."
+    },
+    {
+      "id": "HLD-027",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "合同草稿中的独家条款已被双方删除。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Removed clause."
+    },
+    {
+      "id": "HLD-028",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "关于排他授权的讨论尚未有结论，也没有正式提案。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Ambiguous unresolved."
+    },
+    {
+      "id": "HLD-029",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "The customer wants exclusive rights, but only for the first three months.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Even short exclusivity violates rule."
+    },
+    {
+      "id": "HLD-030",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "We refuse to grant exclusivity; the buyer's request has been withdrawn.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Explicit rejection."
+    },
+    {
+      "id": "HLD-031",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "Commercial proposal: reduce the price by 13%; invoice payable net 75; exclusive reseller license required.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION",
+        "payment_days": "VIOLATION",
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": "Three live conflicts, plus seller receivables advisory."
+    },
+    {
+      "id": "HLD-032",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "最终确认：折扣8%，付款期限30天，不签订任何独家协议。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS",
+        "payment_days": "PASS",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Three rules satisfied."
+    },
+    {
+      "id": "HLD-033",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "The buyer's 18% discount was rejected; the payment period remains undecided; exclusivity is not permitted.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN",
+        "payment_days": "UNKNOWN",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Unknown two terms."
+    },
+    {
+      "id": "HLD-034",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "买方要求折扣15%并且给予独家合作资格；付款约定尚未确认。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION",
+        "payment_days": "UNKNOWN",
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Two violations and one missing."
+    },
+    {
+      "id": "HLD-035",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "Two conflicting offers are open: discount 6% with payment terms 30 days, or discount 14% with payment terms 80 days. Exclusivity has not been discussed.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN",
+        "payment_days": "UNKNOWN",
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Two unresolved packages; no signed deal."
+    },
+    {
+      "id": "HLD-036",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "之前提出独家合作和15%降价，但新版本已明确取消独家、折扣改为9%、账期缩短至40天。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS",
+        "payment_days": "PASS",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Historical term superseded."
+    },
+    {
+      "id": "HLD-037",
+      "category": "commercial",
+      "language": "en",
+      "proposal": "The current signed agreement includes unlimited indemnification and automatic renewal.",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "unlimited_liability",
+        "auto_renewal"
+      ],
+      "annotation_note": "Active risk flags."
+    },
+    {
+      "id": "HLD-038",
+      "category": "commercial",
+      "language": "en",
+      "proposal": "The automatic renewal clause was struck out of the final version.",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": "Withdrawn clause should not generate review."
+    },
+    {
+      "id": "HLD-039",
+      "category": "commercial",
+      "language": "zh",
+      "proposal": "双方最终删除了提前终止违约金，并签署不含违约金的新版本。",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": "No active penalty."
+    },
+    {
+      "id": "HLD-040",
+      "category": "commercial",
+      "language": "zh",
+      "proposal": "客户付款期限90天，合同另有无限赔偿责任。",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "long_receivables",
+        "unlimited_liability"
+      ],
+      "annotation_note": "Two independent commercial risk flags."
+    }
+  ],
+  "label_review": "Manual pre-evaluation label consistency corrections: HLD-013 risk [] because rejected; HLD-014 long_receivables because live 75-day term. No system results inspected before this edit."
+}
