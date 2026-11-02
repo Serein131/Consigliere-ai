@@ -941,7 +941,7 @@ HTML_UI = r"""<!DOCTYPE html>
     <section class="dg-hero" aria-label="Founder DealGuard">
         <div class="dg-kicker" id="dg_kicker">FOUNDER DEALGUARD · DECISION INTELLIGENCE</div>
         <h1 id="dg_headline">Know your red lines before you make a deal.</h1>
-        <p class="dg-subtitle" id="dg_hero_desc">A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.</p>
+        <p class="dg-subtitle" id="dg_hero_desc">Set your thresholds, inspect cited terms, and identify what still needs human confirmation before a deal.</p>
         <div class="dg-chips">
             <span class="dg-chip" id="dg_chip1">✓ Explicit rule checks</span>
             <span class="dg-chip" id="dg_chip2">✓ Evidence, not guesswork</span>
@@ -1114,6 +1114,8 @@ HTML_UI = r"""<!DOCTYPE html>
         let latestTacticalOutput = null;
         let isAgentRunning = false;
         let lastExecutionTimestamp = 0;
+        let dgRequestInFlight = false;
+        let latestDealAuditMode = null;
         let audioStream = null;
         let silenceTimer = null;
 
@@ -1188,9 +1190,9 @@ HTML_UI = r"""<!DOCTYPE html>
                 headline: 'Know your red lines before you make a deal.',
                 hero: 'A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.',
                 chip1:'✓ Explicit rule checks', chip2:'✓ Evidence, not guesswork', chip3:'✓ Unknown ≠ Safe',
-                panel:'01 / Independent deal audit', label:'NO GEMINI CALL REQUIRED',
-                desc:'Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.',
-                check:'◆ Check deal constraints', demo:'Load 3-rule stress test', pending:'Checking…',
+                panel:'01 / Set your deal guardrails', label:'AI + RULES · OPTIONAL',
+                desc:'You control the thresholds. AI mode extracts source quotes for programmatic checking; rules-only remains available.',
+                check:'Rules only · no Gemini', demo:'Load 3-conflict example', pending:'Checking…',
                 notyet:'NOT YET CHECKED', violation:'RULE VIOLATION', unknown:'NEEDS VERIFICATION',
                 pass:'NO DETECTED VIOLATION', checks:'checks', failures:'violations',
                 foot:'Checks only supported, explicitly stated rules. No detected violation does not mean the deal is commercially or legally safe.',
@@ -1207,16 +1209,35 @@ HTML_UI = r"""<!DOCTYPE html>
                 riskTitle:'Commercial risk review · separate from rule compliance',
                 reviewText:'Review independently',warningPrefix:'Rules needing clarification: ',
                 risks:{long_receivables:'Long receivables / cashflow',short_payables:'Short payables / cashflow',
-                    unlimited_liability:'Unlimited liability',auto_renewal:'Auto-renewal',termination_penalty:'Termination penalty'}
+                    unlimited_liability:'Unlimited liability',auto_renewal:'Auto-renewal',termination_penalty:'Termination penalty'},
+                proposalLabel:'02 / Enter the counterparty proposal',proposalPlaceholder:'Use fictional terms: the buyer asks for 15% discount, payment in 90 days and exclusivity.',
+                sourceNote:'Use fictional examples only. Regex redaction is incomplete.',
+                rejectDemo:'Load rejected-offer example',
+                consent:'I understand that AI mode sends masked text to a Gemini provider and redaction is incomplete; I will use fictional data.',
+                auditStep:'03 / Verify the proposal',hybridButton:'✦ AI extraction + rule audit',
+                modeHint:'AI mode extracts cited clauses. Rules-only does not call Gemini.',
+                evidenceTitle:'What the AI extracted',
+                evidenceNote:'A quote match proves that literal text appears in your input, not that its interpretation is correct.',
+                quoteVerified:'Source excerpt found',quoteUnverified:'No verifiable excerpt · review manually',
+                sourceStatuses:{proposed:'Proposed',agreed:'Agreed',rejected:'Rejected',historical:'Historical',ambiguous:'Ambiguous',absent:'Not stated',required:'Exclusivity requested',not_required:'Not required',unresolved:'Unresolved'},
+                termFields:{discount:'Discount',payment:'Payment days',exclusivity:'Exclusivity'},
+                modeHybrid:'Hybrid check · Gemini extraction + rule audit',modeRules:'Rules-only check · no model',
+                processing:'Extracting deal terms and checking evidence…',
+                giveConsent:'Please confirm the AI-processing notice before sending text to Gemini.',
+                invalidSettings:'Configure at least one valid constraint; check payment direction and thresholds.',
+                tooLong:'Please shorten the proposal to 3,500 characters.',
+                failedInput:'This check could not complete. You can still use Rules-only.',
+                errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini rate limit or quota reached. Use Rules-only.',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini temporarily unavailable. Use Rules-only.',MODEL_NOT_CONFIGURED:'Gemini not configured on this deployment. Rules-only works.',MODEL_FORMAT_ERROR:'Gemini returned unreadable terms. Use Rules-only.',MODEL_CONFIGURATION_ERROR:'Gemini model configuration needs checking. Rules-only works.',MODEL_CONSENT_REQUIRED:'Confirm AI-processing notice first.',PROPOSAL_TOO_LONG:'Proposal too long.',NO_CHECKS_CONFIGURED:'Configure at least one constraint.',INVALID_RULES:'Review the rule thresholds.',REQUEST_TOO_LARGE:'Request too large.'},
+                copilot:'Use proposal in the three-stage strategy assistant ↓'
             },
             zh: {
                 kicker:'FOUNDER DEALGUARD · 创始人交易决策系统',
                 headline:'签约之前，先守住你的交易底线。',
-                hero:'面向初创公司创始人的可审计交易承诺防火墙。先用独立规则引擎检查交易条件，再让 Consigliere AI 提供谈判策略。',
+                hero:'先设定交易底线，再核对 Gemini 提取的原文与程序审计结果；无法确认的条款需要人工复核。',
                 chip1:'✓ 明确规则校验',chip2:'✓ 可核查证据',chip3:'✓ 未知不等于安全',
-                panel:'01 / 独立交易底线审计',label:'不调用 GEMINI · 无需模型配额',
-                desc:'使用下方结构化规则与交易文本进行检查；自由文本仅作背景。不能识别的条件会提示人工核查。',
-                check:'◆ 立即检查交易底线',demo:'加载 3 项违规演示',pending:'审计中…',
+                panel:'01 / 设定交易底线',label:'AI＋规则 · 自主选择',
+                desc:'结构化底线由你决定。AI 模式引用原文并用程序核验，仍可选择无需模型的规则检测。',
+                check:'仅规则检测 · 无需 Gemini',demo:'加载三项违规示例',pending:'审计中…',
                 notyet:'尚未检查',violation:'发现底线违规',unknown:'需要进一步核实',
                 pass:'未发现规则冲突',checks:'项检查',failures:'项违规',
                 foot:'只检查已支持且能够识别的明确规则。未发现违规不代表交易在法律或商业上安全。',
@@ -1232,7 +1253,26 @@ HTML_UI = r"""<!DOCTYPE html>
                 maximum:'最多（天）',minimum:'至少（天）',noRule:'不检查付款期限',
                 reviewText:'需要单独评估',warningPrefix:'待澄清的规则：',
                 risks:{long_receivables:'回款周期长 / 现金流',short_payables:'付款周期短 / 现金流',
-                    unlimited_liability:'无限责任',auto_renewal:'自动续约',termination_penalty:'提前解约罚金'}
+                    unlimited_liability:'无限责任',auto_renewal:'自动续约',termination_penalty:'提前解约罚金'},
+                proposalLabel:'02 / 输入对方提出的条件',proposalPlaceholder:'请使用虚构交易：客户要求15%折扣、90天付款，并希望签订独家合作协议。',
+                sourceNote:'仅输入虚构案例。正则脱敏不能确保所有敏感信息已删除。',
+                rejectDemo:'加载已拒绝报价示例',
+                consent:'我理解 AI 模式会把脱敏后的文本发送至 Gemini，脱敏仍可能遗漏信息；我仅使用虚构案例。',
+                auditStep:'03 / 核对条款及证据',hybridButton:'✦ AI 提取证据＋规则核验',
+                modeHint:'混合模式会调用 Gemini；仅规则模式不调用大模型。',
+                evidenceTitle:'AI 提取的条款和原文',
+                evidenceNote:'原文匹配仅证明文本存在，不能证明语义、双方角色或条件状态一定正确。',
+                quoteVerified:'原文引用已找到',quoteUnverified:'未找到可验证引用 · 请人工复核',
+                sourceStatuses:{proposed:'已提出',agreed:'已同意',rejected:'已拒绝',historical:'历史条件',ambiguous:'仍有歧义',absent:'未提及',required:'要求独家',not_required:'不要求独家',unresolved:'尚未确定'},
+                termFields:{discount:'折扣',payment:'付款期限',exclusivity:'独家合作'},
+                modeHybrid:'混合核验 · Gemini 提取＋程序审计',modeRules:'仅规则核验 · 不调用模型',
+                processing:'正在提取条款并核实原文…',
+                giveConsent:'请先勾选同意 AI 文本处理说明。',
+                invalidSettings:'请设置至少一条有效底线，并检查付款期限规则。',
+                tooLong:'交易文本不得超过3500字。',
+                failedInput:'本次核验未完成，可改用仅规则检测。',
+                errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini 额度或频率受限，可使用仅规则模式。',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini 暂时不可用，可使用仅规则模式。',MODEL_NOT_CONFIGURED:'当前部署尚未配置 Gemini，仍可使用仅规则模式。',MODEL_FORMAT_ERROR:'Gemini 未返回有效的条款，可使用仅规则模式。',MODEL_CONFIGURATION_ERROR:'Gemini 配置需要检查，仍可使用仅规则模式。',MODEL_CONSENT_REQUIRED:'请先同意 AI 文本处理说明。',PROPOSAL_TOO_LONG:'交易文本过长。',NO_CHECKS_CONFIGURED:'请先设定底线。',INVALID_RULES:'请检查底线输入。',REQUEST_TOO_LARGE:'请求内容过长。'},
+                copilot:'将文本带入三阶段谈判助手 ↓'
             }
         };
         function getStructuredRules() {
@@ -1257,7 +1297,11 @@ HTML_UI = r"""<!DOCTYPE html>
                 dg_role_label:l.roleLabel,dg_discount_label:l.discountLabel,
                 dg_pay_label:l.payLabel,dg_days_label:l.daysLabel,
                 dg_exclusive_label:l.exclusiveLabel,dg_config_note:l.configNote,
-                dg_risk_title:l.riskTitle
+                dg_risk_title:l.riskTitle,dg_proposal_label:l.proposalLabel,
+                dg_source_note:l.sourceNote,dg_reject_btn:l.rejectDemo,dg_consent_text:l.consent,
+                dg_audit_label:l.auditStep,dg_hybrid_btn:l.hybridButton,dg_mode_hint:l.modeHint,
+                dg_evidence_title:l.evidenceTitle,dg_evidence_note:l.evidenceNote,
+                dg_copilot_btn:l.copilot
             };
             Object.keys(ids).forEach(id => { document.getElementById(id).textContent = ids[id]; });
             const perspective=document.getElementById('dg_role');
@@ -1268,6 +1312,7 @@ HTML_UI = r"""<!DOCTYPE html>
             direction.options[0].text=l.maximum;
             direction.options[1].text=l.minimum;
             direction.options[2].text=l.noRule;
+            document.getElementById('dg_proposal').placeholder=l.proposalPlaceholder;
             document.getElementById('dg_output').style.display='none';
         }
         function loadDealGuardDemo() {
