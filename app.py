@@ -6,6 +6,7 @@ import logging
 import http.client
 from flask import Flask, request, jsonify, render_template_string
 from dealguard import check_deal
+from hybrid_service import execute_hybrid, HybridError, MAX_PROPOSAL_CHARS, MAX_REQUEST_BYTES
 
 app = Flask(__name__)
 
@@ -110,6 +111,42 @@ def audit_only():
         server_fallback_redact(rules)["sanitized_text"],
         payload.get("structured_rules")
     ))
+
+@app.route("/hybrid-audit", methods=["POST"])
+def hybrid_audit():
+    """Opt-in Gemini term extraction + deterministic evidence-grounded audit."""
+    if request.content_length and request.content_length > MAX_REQUEST_BYTES:
+        return jsonify({"error": "REQUEST_TOO_LARGE"}), 413
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "INVALID_JSON"}), 400
+    if os.environ.get("ENABLE_HYBRID_AUDIT", "true").lower() in ("false", "0", "off"):
+        return jsonify({"error": "HYBRID_DISABLED"}), 503
+    if payload.get("consent_to_model_processing") is not True:
+        return jsonify({"error": "MODEL_CONSENT_REQUIRED"}), 400
+    proposal = payload.get("text")
+    if not isinstance(proposal, str) or not proposal.strip():
+        return jsonify({"error": "EMPTY_PROPOSAL"}), 400
+    if len(proposal) > MAX_PROPOSAL_CHARS:
+        return jsonify({"error": "PROPOSAL_TOO_LONG"}), 413
+    # Both client and server perform only best-effort regex redaction.
+    # Financial terms, discount rates and payment days remain analyzable.
+    redacted = server_fallback_redact(proposal)
+    try:
+        output = execute_hybrid(
+            redacted["sanitized_text"],
+            payload.get("structured_rules"),
+            os.environ.get("GEMINI_API_KEY", ""),
+            model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+        )
+    except HybridError as exc:
+        return jsonify({"error": exc.code}), exc.status_code
+    output["redacted_items_count"] = redacted["redaction_count"]
+    response = jsonify(output)
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
 
 @app.route("/analyze", methods=["POST"])
 def analyze_negotiation():
@@ -319,7 +356,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v5.1 | Founder DealGuard — Auditable Decision Intelligence</title>
+    <title>Consigliere AI v5.2 | Founder DealGuard — Evidence-First Audit</title>
     <style>
         :root {
             --bg-canvas: #f8fafc;
@@ -857,6 +894,30 @@ HTML_UI = r"""<!DOCTYPE html>
         .dg-config input[type=checkbox]{width:22px;height:22px}
         .dg-notice{font-size:12px;color:#64748b}.dg-risk{padding:12px;margin-top:12px;border:1px solid #f3d5a7;border-radius:12px;background:#fffbeb}
         .dg-risk strong{color:#92400e;font-size:13px}.dg-risk p{font-size:12px;margin:6px 0;color:#78350f}
+        .dg-step{font-size:11px;color:#0f766e;letter-spacing:.06em;font-weight:800;text-transform:uppercase;margin:16px 0 7px}
+        .dg-proposal{min-height:116px;resize:vertical;font-size:14px;line-height:1.7}
+        .dg-meta-line{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#64748b;line-height:1.5;margin:5px 0}
+        .dg-meta-line span{overflow-wrap:anywhere}
+        .dg-consent{display:flex;align-items:flex-start;gap:10px;margin:16px 0 0;background:#f8fafc;
+            border:1px solid #e2e8f0;border-radius:11px;padding:12px;font-size:12px;color:#475569;line-height:1.6;font-weight:500}
+        .dg-consent input{width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:#0b6b62}
+        .dg-action-hint{font-size:12px;color:#64748b;margin:9px 0 0;line-height:1.6}
+        .dg-copilot-link{display:none;margin-top:12px;width:auto;border:1px solid #cbd5e1;background:#fff;color:#0f172a}
+        .dg-copilot-link:hover{background:#f1f5f9}
+        .dg-evidence{margin:14px 0;padding:15px;border:1px solid #d6e9ed;background:#f8fcfc;border-radius:12px}
+        .dg-evidence h3{margin:0 0 4px;font-size:14px;color:#154e54}
+        .dg-evidence > p{font-size:11px;line-height:1.55;color:#64748b;margin:0 0 11px}
+        .dg-term-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+        .dg-term{background:#fff;border:1px solid #dbe7ee;padding:11px;border-radius:10px;overflow-wrap:anywhere;min-height:95px}
+        .dg-term strong{font-size:12px;color:#163446;display:block}
+        .dg-term em{font-size:11px;font-style:normal;color:#64748b;display:block;margin:5px 0}
+        .dg-term q{font-size:11px;line-height:1.65;color:#0f766e;display:block;margin-top:7px;padding:7px;border-left:2px solid #14b8a6;background:#f0fdfa}
+        .dg-term .dg-unverified{font-size:11px;color:#a16207;margin-top:7px}
+        .dg-panel .dg-danger{color:#b91c1c}
+        .dg-result-mode{font-size:11px;color:#64748b;margin:0 0 10px}
+        .dg-actions .dg-primary[disabled],.dg-actions .dg-secondary[disabled]{opacity:.55;cursor:not-allowed}
+        @media(max-width:680px){.dg-term-grid{grid-template-columns:1fr}.dg-meta-line{flex-wrap:wrap}}
+
         @media(max-width:680px){.dg-config{grid-template-columns:1fr 1fr}
           .dg-hero{padding:23px 19px;border-radius:15px}
           .dg-panel{padding:18px 16px}
@@ -868,7 +929,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <body>
     <div class="header-row">
         <div>
-            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.1 · Founder DealGuard</span></div>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.2 · Founder DealGuard</span></div>
             <div class="subtitle" id="subtitle_text">Set limits · Verify terms · Explore options</div>
         </div>
         <div class="lang-switch">
@@ -882,7 +943,7 @@ HTML_UI = r"""<!DOCTYPE html>
     <section class="dg-hero" aria-label="Founder DealGuard">
         <div class="dg-kicker" id="dg_kicker">FOUNDER DEALGUARD · DECISION INTELLIGENCE</div>
         <h1 id="dg_headline">Know your red lines before you make a deal.</h1>
-        <p class="dg-subtitle" id="dg_hero_desc">A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.</p>
+        <p class="dg-subtitle" id="dg_hero_desc">Set your thresholds, inspect cited terms, and identify what still needs human confirmation before a deal.</p>
         <div class="dg-chips">
             <span class="dg-chip" id="dg_chip1">✓ Explicit rule checks</span>
             <span class="dg-chip" id="dg_chip2">✓ Evidence, not guesswork</span>
@@ -892,8 +953,8 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <section class="dg-panel" id="dealguard_panel" aria-label="DealGuard independent audit">
         <div class="dg-panel-head">
-            <h2 id="dg_panel_title">01 / Independent deal audit</h2>
-            <span class="dg-label" id="dg_no_llm">NO GEMINI CALL REQUIRED</span>
+            <h2 id="dg_panel_title">01 / Set your deal guardrails</h2>
+            <span class="dg-label" id="dg_no_llm">CHOOSE AI OR RULES-ONLY</span>
         </div>
         <p id="dg_panel_desc">Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.</p>
         <div class="dg-config">
@@ -903,20 +964,44 @@ HTML_UI = r"""<!DOCTYPE html>
             <div><label for="dg_pay_days" id="dg_days_label">Payment days threshold</label><input type="number" id="dg_pay_days" min="0" max="3650" value="45"></div>
             <div><label for="dg_no_exclusive" id="dg_exclusive_label">Prohibit exclusivity</label><input type="checkbox" id="dg_no_exclusive" checked></div>
         </div>
-        <p class="dg-notice" id="dg_config_note">Structured thresholds control the audit. Free-text notes below provide context but do not create additional enforced rules.</p>
-        <div class="dg-actions">
-            <button type="button" class="dg-primary" onclick="runDealGuardAudit()" id="dg_check_btn">◆ Check deal constraints</button>
-            <button type="button" class="dg-secondary" onclick="loadDealGuardDemo()" id="dg_demo_btn">Load 3-rule stress test</button>
+        <p class="dg-notice" id="dg_config_note">These thresholds are the enforced rules. Free-text notes below are not machine-enforced.</p>
+        <label class="dg-step" for="dg_proposal" id="dg_proposal_label">02 / Enter the proposed deal terms</label>
+        <textarea class="dg-proposal" id="dg_proposal" rows="4" maxlength="3500" spellcheck="true"
+            placeholder="Example: Buyer wants 15% discount, net 90-day payment and exclusivity."></textarea>
+        <div class="dg-meta-line">
+            <span id="dg_source_note">Only use fictional examples. Redaction cannot guarantee confidentiality.</span>
+            <span id="dg_chars">0 / 3500</span>
         </div>
+        <div class="dg-actions">
+            <button type="button" class="dg-secondary" onclick="loadDealGuardDemo('violation')" id="dg_demo_btn">Load 3-conflict example</button>
+            <button type="button" class="dg-secondary" onclick="loadDealGuardDemo('rejected')" id="dg_reject_btn">Load rejected-offer example</button>
+        </div>
+        <label class="dg-consent" for="dg_consent">
+            <input id="dg_consent" type="checkbox"/>
+            <span id="dg_consent_text">I understand that AI mode sends the redacted text to a Gemini provider. Redaction is incomplete; I will use fictional data.</span>
+        </label>
+        <div class="dg-step" id="dg_audit_label">03 / Verify the proposal</div>
+        <div class="dg-actions">
+            <button type="button" class="dg-primary" onclick="runHybridAudit()" id="dg_hybrid_btn">✦ AI extraction + rule audit</button>
+            <button type="button" class="dg-secondary" onclick="runDealGuardAudit()" id="dg_check_btn">Rules only · no Gemini</button>
+        </div>
+        <p class="dg-action-hint" id="dg_mode_hint">AI mode extracts and quotes clauses. Rules-only is available without an API call.</p>
         <div id="dg_output" class="dg-output" role="status" aria-live="polite">
+            <div class="dg-result-mode" id="dg_mode_used"></div>
             <div class="dg-summary">
                 <strong class="dg-status unknown" id="dg_status">NOT YET CHECKED</strong>
                 <span class="dg-count" id="dg_counter"></span>
             </div>
+            <div class="dg-evidence" id="dg_evidence" style="display:none">
+                <h3 id="dg_evidence_title">What the AI extracted</h3>
+                <p id="dg_evidence_note">A quote match verifies literal text, not its commercial meaning. Review each term before acting.</p>
+                <div class="dg-term-grid" id="dg_extracted_terms"></div>
+            </div>
             <div class="dg-findings" id="dg_findings"></div>
             <div class="dg-risk" id="dg_risk" style="display:none"><strong id="dg_risk_title">Commercial risk review — separate from rules</strong><div id="dg_risk_findings"></div></div>
             <div id="dg_rule_warnings" class="dg-footnote"></div>
-            <div class="dg-footnote" id="dg_footnote">A rule audit cannot certify contractual safety or replace qualified legal and financial review.</div>
+            <div class="dg-footnote" id="dg_footnote">This is decision support, not a contract certification. Always verify ambiguous terms.</div>
+            <button type="button" class="action-btn dg-copilot-link" id="dg_copilot_btn" onclick="sendProposalToCopilot()">Use in 3-stage strategy assistant ↓</button>
         </div>
     </section>
 
@@ -1031,6 +1116,8 @@ HTML_UI = r"""<!DOCTYPE html>
         let latestTacticalOutput = null;
         let isAgentRunning = false;
         let lastExecutionTimestamp = 0;
+        let dgRequestInFlight = false;
+        let latestDealAuditMode = null;
         let audioStream = null;
         let silenceTimer = null;
 
@@ -1105,9 +1192,9 @@ HTML_UI = r"""<!DOCTYPE html>
                 headline: 'Know your red lines before you make a deal.',
                 hero: 'A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.',
                 chip1:'✓ Explicit rule checks', chip2:'✓ Evidence, not guesswork', chip3:'✓ Unknown ≠ Safe',
-                panel:'01 / Independent deal audit', label:'NO GEMINI CALL REQUIRED',
-                desc:'Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.',
-                check:'◆ Check deal constraints', demo:'Load 3-rule stress test', pending:'Checking…',
+                panel:'01 / Set your deal guardrails', label:'AI + RULES · OPTIONAL',
+                desc:'You control the thresholds. AI mode extracts source quotes for programmatic checking; rules-only remains available.',
+                check:'Rules only · no Gemini', demo:'Load 3-conflict example', pending:'Checking…',
                 notyet:'NOT YET CHECKED', violation:'RULE VIOLATION', unknown:'NEEDS VERIFICATION',
                 pass:'NO DETECTED VIOLATION', checks:'checks', failures:'violations',
                 foot:'Checks only supported, explicitly stated rules. No detected violation does not mean the deal is commercially or legally safe.',
@@ -1124,16 +1211,35 @@ HTML_UI = r"""<!DOCTYPE html>
                 riskTitle:'Commercial risk review · separate from rule compliance',
                 reviewText:'Review independently',warningPrefix:'Rules needing clarification: ',
                 risks:{long_receivables:'Long receivables / cashflow',short_payables:'Short payables / cashflow',
-                    unlimited_liability:'Unlimited liability',auto_renewal:'Auto-renewal',termination_penalty:'Termination penalty'}
+                    unlimited_liability:'Unlimited liability',auto_renewal:'Auto-renewal',termination_penalty:'Termination penalty'},
+                proposalLabel:'02 / Enter the counterparty proposal',proposalPlaceholder:'Use fictional terms: the buyer asks for 15% discount, payment in 90 days and exclusivity.',
+                sourceNote:'Use fictional examples only. Regex redaction is incomplete.',
+                rejectDemo:'Load rejected-offer example',
+                consent:'I understand that AI mode sends masked text to a Gemini provider and redaction is incomplete; I will use fictional data.',
+                auditStep:'03 / Verify the proposal',hybridButton:'✦ AI extraction + rule audit',
+                modeHint:'AI mode extracts cited clauses. Rules-only does not call Gemini.',
+                evidenceTitle:'What the AI extracted',
+                evidenceNote:'A quote match proves that literal text appears in your input, not that its interpretation is correct.',
+                quoteVerified:'Source excerpt found',quoteUnverified:'No verifiable excerpt · review manually',
+                sourceStatuses:{proposed:'Proposed',agreed:'Agreed',rejected:'Rejected',historical:'Historical',ambiguous:'Ambiguous',absent:'Not stated',required:'Exclusivity requested',not_required:'Not required',unresolved:'Unresolved'},
+                termFields:{discount:'Discount',payment:'Payment days',exclusivity:'Exclusivity'},
+                modeHybrid:'Hybrid check · Gemini extraction + rule audit',modeRules:'Rules-only check · no model',
+                processing:'Extracting deal terms and checking evidence…',
+                giveConsent:'Please confirm the AI-processing notice before sending text to Gemini.',
+                invalidSettings:'Configure at least one valid constraint; check payment direction and thresholds.',
+                tooLong:'Please shorten the proposal to 3,500 characters.',
+                failedInput:'This check could not complete. You can still use Rules-only.',
+                errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini rate limit or quota reached. Use Rules-only.',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini temporarily unavailable. Use Rules-only.',MODEL_NOT_CONFIGURED:'Gemini not configured on this deployment. Rules-only works.',MODEL_FORMAT_ERROR:'Gemini returned unreadable terms. Use Rules-only.',MODEL_CONFIGURATION_ERROR:'Gemini model configuration needs checking. Rules-only works.',HYBRID_DISABLED:'AI audit is disabled on this deployment. Rules-only still works.',MODEL_CONSENT_REQUIRED:'Confirm AI-processing notice first.',PROPOSAL_TOO_LONG:'Proposal too long.',NO_CHECKS_CONFIGURED:'Configure at least one constraint.',INVALID_RULES:'Review the rule thresholds.',REQUEST_TOO_LARGE:'Request too large.'},
+                copilot:'Use proposal in the three-stage strategy assistant ↓'
             },
             zh: {
                 kicker:'FOUNDER DEALGUARD · 创始人交易决策系统',
                 headline:'签约之前，先守住你的交易底线。',
-                hero:'面向初创公司创始人的可审计交易承诺防火墙。先用独立规则引擎检查交易条件，再让 Consigliere AI 提供谈判策略。',
+                hero:'先设定交易底线，再核对 Gemini 提取的原文与程序审计结果；无法确认的条款需要人工复核。',
                 chip1:'✓ 明确规则校验',chip2:'✓ 可核查证据',chip3:'✓ 未知不等于安全',
-                panel:'01 / 独立交易底线审计',label:'不调用 GEMINI · 无需模型配额',
-                desc:'使用下方结构化规则与交易文本进行检查；自由文本仅作背景。不能识别的条件会提示人工核查。',
-                check:'◆ 立即检查交易底线',demo:'加载 3 项违规演示',pending:'审计中…',
+                panel:'01 / 设定交易底线',label:'AI＋规则 · 自主选择',
+                desc:'结构化底线由你决定。AI 模式引用原文并用程序核验，仍可选择无需模型的规则检测。',
+                check:'仅规则检测 · 无需 Gemini',demo:'加载三项违规示例',pending:'审计中…',
                 notyet:'尚未检查',violation:'发现底线违规',unknown:'需要进一步核实',
                 pass:'未发现规则冲突',checks:'项检查',failures:'项违规',
                 foot:'只检查已支持且能够识别的明确规则。未发现违规不代表交易在法律或商业上安全。',
@@ -1149,7 +1255,26 @@ HTML_UI = r"""<!DOCTYPE html>
                 maximum:'最多（天）',minimum:'至少（天）',noRule:'不检查付款期限',
                 reviewText:'需要单独评估',warningPrefix:'待澄清的规则：',
                 risks:{long_receivables:'回款周期长 / 现金流',short_payables:'付款周期短 / 现金流',
-                    unlimited_liability:'无限责任',auto_renewal:'自动续约',termination_penalty:'提前解约罚金'}
+                    unlimited_liability:'无限责任',auto_renewal:'自动续约',termination_penalty:'提前解约罚金'},
+                proposalLabel:'02 / 输入对方提出的条件',proposalPlaceholder:'请使用虚构交易：客户要求15%折扣、90天付款，并希望签订独家合作协议。',
+                sourceNote:'仅输入虚构案例。正则脱敏不能确保所有敏感信息已删除。',
+                rejectDemo:'加载已拒绝报价示例',
+                consent:'我理解 AI 模式会把脱敏后的文本发送至 Gemini，脱敏仍可能遗漏信息；我仅使用虚构案例。',
+                auditStep:'03 / 核对条款及证据',hybridButton:'✦ AI 提取证据＋规则核验',
+                modeHint:'混合模式会调用 Gemini；仅规则模式不调用大模型。',
+                evidenceTitle:'AI 提取的条款和原文',
+                evidenceNote:'原文匹配仅证明文本存在，不能证明语义、双方角色或条件状态一定正确。',
+                quoteVerified:'原文引用已找到',quoteUnverified:'未找到可验证引用 · 请人工复核',
+                sourceStatuses:{proposed:'已提出',agreed:'已同意',rejected:'已拒绝',historical:'历史条件',ambiguous:'仍有歧义',absent:'未提及',required:'要求独家',not_required:'不要求独家',unresolved:'尚未确定'},
+                termFields:{discount:'折扣',payment:'付款期限',exclusivity:'独家合作'},
+                modeHybrid:'混合核验 · Gemini 提取＋程序审计',modeRules:'仅规则核验 · 不调用模型',
+                processing:'正在提取条款并核实原文…',
+                giveConsent:'请先勾选同意 AI 文本处理说明。',
+                invalidSettings:'请设置至少一条有效底线，并检查付款期限规则。',
+                tooLong:'交易文本不得超过3500字。',
+                failedInput:'本次核验未完成，可改用仅规则检测。',
+                errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini 额度或频率受限，可使用仅规则模式。',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini 暂时不可用，可使用仅规则模式。',MODEL_NOT_CONFIGURED:'当前部署尚未配置 Gemini，仍可使用仅规则模式。',MODEL_FORMAT_ERROR:'Gemini 未返回有效的条款，可使用仅规则模式。',MODEL_CONFIGURATION_ERROR:'Gemini 配置需要检查，仍可使用仅规则模式。',HYBRID_DISABLED:'当前部署已关闭 AI 审计，仍可使用仅规则模式。',MODEL_CONSENT_REQUIRED:'请先同意 AI 文本处理说明。',PROPOSAL_TOO_LONG:'交易文本过长。',NO_CHECKS_CONFIGURED:'请先设定底线。',INVALID_RULES:'请检查底线输入。',REQUEST_TOO_LARGE:'请求内容过长。'},
+                copilot:'将文本带入三阶段谈判助手 ↓'
             }
         };
         function getStructuredRules() {
@@ -1174,7 +1299,11 @@ HTML_UI = r"""<!DOCTYPE html>
                 dg_role_label:l.roleLabel,dg_discount_label:l.discountLabel,
                 dg_pay_label:l.payLabel,dg_days_label:l.daysLabel,
                 dg_exclusive_label:l.exclusiveLabel,dg_config_note:l.configNote,
-                dg_risk_title:l.riskTitle
+                dg_risk_title:l.riskTitle,dg_proposal_label:l.proposalLabel,
+                dg_source_note:l.sourceNote,dg_reject_btn:l.rejectDemo,dg_consent_text:l.consent,
+                dg_audit_label:l.auditStep,dg_hybrid_btn:l.hybridButton,dg_mode_hint:l.modeHint,
+                dg_evidence_title:l.evidenceTitle,dg_evidence_note:l.evidenceNote,
+                dg_copilot_btn:l.copilot
             };
             Object.keys(ids).forEach(id => { document.getElementById(id).textContent = ids[id]; });
             const perspective=document.getElementById('dg_role');
@@ -1185,91 +1314,192 @@ HTML_UI = r"""<!DOCTYPE html>
             direction.options[0].text=l.maximum;
             direction.options[1].text=l.minimum;
             direction.options[2].text=l.noRule;
+            document.getElementById('dg_proposal').placeholder=l.proposalPlaceholder;
             document.getElementById('dg_output').style.display='none';
         }
-        function loadDealGuardDemo() {
-            const zh = currentLang === 'zh';
+        // Every displayed quote and status is constructed as text, never injected HTML.
+        function updateDealCharCount() {
+            const el=document.getElementById('dg_proposal');
+            document.getElementById('dg_chars').textContent=el.value.length+' / 3500';
+        }
+        function invalidateDealAudit() {
+            if(dgRequestInFlight)return;
+            document.getElementById('dg_output').style.display='none';
+            document.getElementById('dg_copilot_btn').style.display='none';
+            latestDealAuditMode=null;
+        }
+        function loadDealGuardDemo(kind='violation') {
+            const zh=currentLang==='zh';
             setPhase('in_deal');
-            document.getElementById('hard_bottom_line').value = zh
-                ? '目标：避免超额折扣、过长收款账期和独家合作。'
-                : 'Goal: avoid excessive discounts, long receivable terms and exclusivity.';
             document.getElementById('dg_role').value='seller';
             document.getElementById('dg_discount').value='10';
             document.getElementById('dg_pay_dir').value='maximum';
             document.getElementById('dg_pay_days').value='45';
             document.getElementById('dg_no_exclusive').checked=true;
-            document.getElementById('input_text').value = zh
-                ? '客户要求15%折扣、付款期限30天、独家合作，并希望今天签署。'
-                : 'The customer requires a 15% discount, payment terms 30 days, and an exclusivity agreement signed today.';
+            const proposal=kind==='rejected'
+                ? (zh
+                    ? '买方之前要求15%折扣，但我们已经拒绝；双方同意30天账期，且不接受任何独家合作条款。'
+                    : 'The buyer previously requested a 15% discount, which we rejected. Both sides agreed to net 30 days and no exclusivity.')
+                : (zh
+                    ? '客户要求15%折扣、90天付款期限，并要求签订12个月独家合作协议。'
+                    : 'The buyer requires a 15% discount, payment terms of 90 days, and a 12-month exclusivity agreement.');
+            document.getElementById('dg_proposal').value=proposal;
+            document.getElementById('input_text').value=proposal;
+            updateDealCharCount();
+            invalidateDealAudit();
+            // Auto-running the free rules-only preview never consumes Gemini quota.
             runDealGuardAudit();
         }
         function addAuditFinding(parent, finding, l) {
-            const card=document.createElement('div'); card.className='dg-finding';
+            const card=document.createElement('div');card.className='dg-finding';
             const title=document.createElement('div');title.className='dg-finding-title';
             title.textContent=l.rules[finding.rule] || finding.rule;
-            const st=document.createElement('div');st.className='dg-finding-state '+
-                (finding.status === 'VIOLATION' ? 'violation' : finding.status === 'PASS' ? 'pass' : 'unknown');
-            st.textContent=l.states[finding.status] || 'UNKNOWN';
-            const ev=document.createElement('div');ev.className='dg-finding-evidence';
+            const state=document.createElement('div');
+            state.className='dg-finding-state '+(finding.status==='VIOLATION'?'violation':finding.status==='PASS'?'pass':'unknown');
+            state.textContent=l.states[finding.status] || l.states.UNKNOWN;
+            const evidence=document.createElement('div');evidence.className='dg-finding-evidence';
             const parts=[];
-            if(finding.observed!==undefined)parts.push(l.observed+': '+finding.observed);
-            if(finding.limit!==undefined)parts.push(l.limit+': '+finding.limit);
+            if(finding.observed!==undefined && finding.observed!==null)parts.push(l.observed+': '+finding.observed);
+            if(finding.limit!==undefined && finding.limit!==null)parts.push(l.limit+': '+finding.limit);
             if(finding.minimum!==undefined && finding.minimum!==null)parts.push(l.min+': '+finding.minimum);
             if(finding.maximum!==undefined && finding.maximum!==null)parts.push(l.max+': '+finding.maximum);
-            if(finding.evidence && finding.evidence !== 'Explicit exclusivity language detected.')parts.push(finding.evidence);
+            if(finding.evidence && finding.evidence!=='Explicit exclusivity language detected.')parts.push(finding.evidence);
             if(finding.reason)parts.push(finding.reason);
-            ev.textContent=parts.join(' · ');
-            card.appendChild(title);card.appendChild(st);card.appendChild(ev);parent.appendChild(card);
+            evidence.textContent=parts.join(' · ');
+            card.append(title,state,evidence);parent.appendChild(card);
         }
-        async function runDealGuardAudit() {
-            const l=DG_LABELS[currentLang],output=document.getElementById('dg_output'),
-                status=document.getElementById('dg_status'),
-                counter=document.getElementById('dg_counter'),
-                findings=document.getElementById('dg_findings'),
-                btn=document.getElementById('dg_check_btn');
-            output.style.display='block';findings.replaceChildren();counter.textContent='';
-            const text=document.getElementById('input_text').value;
-            const rules=document.getElementById('hard_bottom_line').value;
-            if(!text.trim()){
-                status.className='dg-status unknown';status.textContent=l.missing;return;
+        function renderExtractedTerms(payload, l) {
+            const box=document.getElementById('dg_evidence');
+            const parent=document.getElementById('dg_extracted_terms');
+            parent.replaceChildren();
+            const terms=payload.extraction && Array.isArray(payload.extraction.terms)
+                ?payload.extraction.terms:[];
+            box.style.display=terms.length?'block':'none';
+            terms.forEach(term=>{
+                const item=document.createElement('div');item.className='dg-term';
+                const heading=document.createElement('strong');
+                heading.textContent=l.termFields[term.field]||term.field;
+                const subtitle=document.createElement('em');
+                subtitle.textContent=(l.sourceStatuses[term.source_status]||term.source_status||l.unknown)
+                    +(term.value!==null && term.value!==undefined?' · '+term.value+
+                     (term.field==='discount'?'%':term.field==='payment'?(currentLang==='zh'?' 天':' days'):''):'');
+                const evidence=document.createElement(term.quote_verified?'q':'div');
+                if(!term.quote_verified)evidence.className='dg-unverified';
+                evidence.textContent=term.quote_verified?term.evidence:l.quoteUnverified;
+                item.append(heading,subtitle,evidence);parent.appendChild(item);
+            });
+        }
+        function renderDealAudit(payload, mode) {
+            const l=DG_LABELS[currentLang];
+            const audit=mode==='hybrid'?payload.audit:payload;
+            if(!audit || !Array.isArray(audit.findings))throw new Error('Malformed audit result');
+            const state=audit.assessment||'UNKNOWN';
+            const status=document.getElementById('dg_status');
+            status.className='dg-status '+(state==='VIOLATION'?'violation':state==='NO_DETECTED_VIOLATION'?'pass':'unknown');
+            status.textContent=state==='VIOLATION'?l.violation:state==='NO_DETECTED_VIOLATION'?l.pass:l.unknown;
+            document.getElementById('dg_counter').textContent=(audit.configured_checks||0)+' '+l.checks+' · '+
+                (audit.violation_count||0)+' '+l.failures;
+            document.getElementById('dg_mode_used').textContent=mode==='hybrid'
+                ?l.modeHybrid+' · '+(payload.model_used||'Gemini')+' · '+(payload.elapsed_ms||0)+' ms'
+                :l.modeRules;
+            const findings=document.getElementById('dg_findings');
+            findings.replaceChildren();
+            audit.findings.forEach(f=>addAuditFinding(findings,f,l));
+            if(mode==='hybrid')renderExtractedTerms(payload,l);
+            else{
+                document.getElementById('dg_extracted_terms').replaceChildren();
+                document.getElementById('dg_evidence').style.display='none';
             }
-            btn.disabled=true;status.className='dg-status unknown';status.textContent=l.pending;
+            const risks=audit.commercial_risks||[];
+            const riskBox=document.getElementById('dg_risk');
+            const riskContent=document.getElementById('dg_risk_findings');
+            riskContent.replaceChildren();
+            riskBox.style.display=risks.length?'block':'none';
+            risks.forEach(r=>{
+                const item=document.createElement('p');
+                item.textContent=(l.risks[r.code]||r.code)+(r.evidence?' · '+r.evidence:'')+
+                    ' — '+l.reviewText;
+                riskContent.appendChild(item);
+            });
+            const warnings=audit.rule_warnings||[];
+            document.getElementById('dg_rule_warnings').textContent=
+                warnings.length?l.warningPrefix+warnings.join('; '):'';
+            document.getElementById('dg_copilot_btn').style.display='inline-block';
+            latestDealAuditMode=mode;
+        }
+        function validateDealInput(mode) {
+            const l=DG_LABELS[currentLang];
+            const raw=document.getElementById('dg_proposal').value.trim();
+            if(!raw)return l.missing;
+            if(raw.length>3500)return l.tooLong;
+            const rules=getStructuredRules();
+            const discount=document.getElementById('dg_discount').value;
+            const days=document.getElementById('dg_pay_days').value;
+            if(discount!=='' && (!Number.isFinite(rules.discount_max_pct) || rules.discount_max_pct<0 || rules.discount_max_pct>100))return l.invalidSettings;
+            if(rules.payment_direction && (days==='' || rules.payment_days<0 || rules.payment_days>3650 || !Number.isFinite(rules.payment_days)))return l.invalidSettings;
+            if(discount==='' && rules.payment_direction===null && !rules.prohibit_exclusivity)return l.invalidSettings;
+            if(mode==='hybrid' && !document.getElementById('dg_consent').checked)return l.giveConsent;
+            return '';
+        }
+        async function runDealAudit(mode) {
+            if(dgRequestInFlight)return;
+            const l=DG_LABELS[currentLang];
+            const output=document.getElementById('dg_output'),status=document.getElementById('dg_status');
+            output.style.display='block';
+            document.getElementById('dg_findings').replaceChildren();
+            document.getElementById('dg_extracted_terms').replaceChildren();
+            document.getElementById('dg_evidence').style.display='none';
+            document.getElementById('dg_risk').style.display='none';
+            document.getElementById('dg_copilot_btn').style.display='none';
+            document.getElementById('dg_counter').textContent='';
+            document.getElementById('dg_rule_warnings').textContent='';
+            document.getElementById('dg_mode_used').textContent='';
+            const invalid=validateDealInput(mode);
+            if(invalid){
+                status.className='dg-status unknown';status.textContent=invalid;return;
+            }
+            dgRequestInFlight=true;
+            const hybridBtn=document.getElementById('dg_hybrid_btn');
+            const ruleBtn=document.getElementById('dg_check_btn');
+            hybridBtn.disabled=true;ruleBtn.disabled=true;
+            status.className='dg-status unknown';
+            status.textContent=mode==='hybrid'?l.processing:l.pending;
+            const controller=new AbortController();
+            const clock=setTimeout(()=>controller.abort(),mode==='hybrid'?29000:11000);
             try{
-                // Identifiers are masked with the same client-side helper as the three-stage app.
-                const body={text:clientSideRedact(text).sanitizedText,
-                    hard_bottom_line:clientSideRedact(rules).sanitizedText,
-                    structured_rules:getStructuredRules()};
-                const res=await fetch('/audit',{method:'POST',
-                    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-                const result=await res.json();
-                if(!res.ok || result.error)throw new Error(result.error || 'HTTP '+res.status);
-                const state=result.assessment || 'UNKNOWN';
-                status.className='dg-status '+(state==='VIOLATION'?'violation':
-                    state==='NO_DETECTED_VIOLATION'?'pass':'unknown');
-                status.textContent=state==='VIOLATION'?l.violation:
-                    state==='NO_DETECTED_VIOLATION'?l.pass:l.unknown;
-                counter.textContent=(result.configured_checks || 0)+' '+l.checks+' · '+
-                    (result.violation_count || 0)+' '+l.failures;
-                (result.findings || []).forEach(f=>addAuditFinding(findings,f,l));
-                const commercial=document.getElementById('dg_risk'),
-                    commercialFindings=document.getElementById('dg_risk_findings');
-                commercialFindings.replaceChildren();
-                const risks=result.commercial_risks || [];
-                commercial.style.display=risks.length?'block':'none';
-                risks.forEach(r=>{
-                    const paragraph=document.createElement('p');
-                    paragraph.textContent=(l.risks[r.code] || r.code)+
-                        (r.evidence?' · '+r.evidence:'')+' — '+
-                        (l.reviewText || 'Review separately');
-                    commercialFindings.appendChild(paragraph);
+                const payload={
+                    text:clientSideRedact(document.getElementById('dg_proposal').value).sanitizedText,
+                    structured_rules:getStructuredRules()
+                };
+                if(mode==='hybrid')payload.consent_to_model_processing=true;
+                const response=await fetch(mode==='hybrid'?'/hybrid-audit':'/audit',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(payload),signal:controller.signal
                 });
-                const warnings=(result.rule_warnings || []);
-                document.getElementById('dg_rule_warnings').textContent=
-                    warnings.length?l.warningPrefix+warnings.join('; '):'';
-            }catch(err){
-                status.className='dg-status violation';
-                status.textContent=l.error+err.message;
-            }finally{btn.disabled=false;}
+                let data;
+                try{data=await response.json();}catch(e){throw new Error('HTTP '+response.status);}
+                if(!response.ok || data.error)throw new Error(l.errorCodes[data.error]||data.error||'HTTP '+response.status);
+                renderDealAudit(data,mode);
+            }catch(e){
+                status.className='dg-status unknown';
+                status.textContent=e.name==='AbortError'?l.failedInput:l.error+e.message;
+                document.getElementById('dg_mode_used').textContent=mode==='hybrid'?l.modeHybrid:l.modeRules;
+            }finally{
+                clearTimeout(clock);
+                dgRequestInFlight=false;
+                hybridBtn.disabled=false;ruleBtn.disabled=false;
+            }
+        }
+        function runDealGuardAudit(){return runDealAudit('rules');}
+        function runHybridAudit(){return runDealAudit('hybrid');}
+        function sendProposalToCopilot(){
+            const proposal=document.getElementById('dg_proposal').value;
+            if(!proposal.trim())return;
+            setPhase('in_deal');
+            document.getElementById('input_text').value=proposal;
+            const stage=document.getElementById('input_text');
+            stage.scrollIntoView({behavior:'smooth',block:'center'});
+            stage.focus({preventScroll:true});
         }
 
         function setPhase(phase) {
@@ -1695,12 +1925,17 @@ HTML_UI = r"""<!DOCTYPE html>
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            const sysLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
-            if (sysLang.startsWith('en')) {
-                setLanguage('en');
-            } else {
-                setLanguage('zh');
-            }
+            const sysLang=(navigator.language || navigator.userLanguage || '').toLowerCase();
+            setLanguage(sysLang.startsWith('en')?'en':'zh');
+            const editor=document.getElementById('dg_proposal');
+            editor.addEventListener('input',()=>{updateDealCharCount();invalidateDealAudit();});
+            ['dg_role','dg_discount','dg_pay_dir','dg_pay_days','dg_no_exclusive'].forEach(id=>{
+                const element=document.getElementById(id);
+                element.addEventListener('input',invalidateDealAudit);
+                element.addEventListener('change',invalidateDealAudit);
+            });
+            // A previous result must never look current after the input or rule limits change.
+            updateDealCharCount();
         });
     </script>
 </body>

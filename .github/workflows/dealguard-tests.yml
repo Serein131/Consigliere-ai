@@ -2,7 +2,7 @@ name: DealGuard Regression
 on:
   pull_request:
   push:
-    branches: [feature/dealguard-constraint-engine, feature/dealguard-visible-dashboard]
+    branches: [main, feature/hybrid-product-v52-20261102, feature/dealguard-constraint-engine, feature/dealguard-visible-dashboard]
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
@@ -11,10 +11,23 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Compile and test deterministic deal checks
+      - name: Install Flask for API integration tests
+        run: python -m pip install "flask>=3.0.0"
+      - name: Compile and test rule checks + hybrid API
         run: |
-          python -m py_compile app.py dealguard.py
+          python -m py_compile app.py dealguard.py hybrid_service.py research/evidence_hybrid.py
           python -m unittest discover -s tests -v
+      - name: Check browser JavaScript parses
+        run: |
+          python - <<'PY'
+          import pathlib, re
+          source=pathlib.Path("app.py").read_text(encoding="utf-8")
+          match=re.search(r"<script>(.*?)</script>",source,re.S)
+          if not match:
+              raise SystemExit("No browser script found in app.py")
+          pathlib.Path("/tmp/consigliere-ui.js").write_text(match.group(1),encoding="utf-8")
+          PY
+          node --check /tmp/consigliere-ui.js
       - name: Evaluate 60 synthetic audit cases (diagnostic, not a general accuracy claim)
         run: |
           python research/evaluate.py
