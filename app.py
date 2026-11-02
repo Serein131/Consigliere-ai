@@ -1136,12 +1136,16 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <script>
         let currentLang = 'en';
-        let currentPhase = 'in_deal';
+        let currentPhase = 'pre_deal';
         let latestTacticalOutput = null;
         let isAgentRunning = false;
         let lastExecutionTimestamp = 0;
         let dgRequestInFlight = false;
         let latestDealAuditMode = null;
+        let stageDrafts = {pre_deal:'', in_deal:'', post_deal:''};
+        let languageInitialized = false;
+        let auditInputRevision = 0;
+        let activeAgentRequestPhase = null;
         let audioStream = null;
         let silenceTimer = null;
 
@@ -1338,41 +1342,38 @@ HTML_UI = r"""<!DOCTYPE html>
             direction.options[0].text=l.maximum;
             direction.options[1].text=l.minimum;
             direction.options[2].text=l.noRule;
-            document.getElementById('dg_proposal').placeholder=l.proposalPlaceholder;
+            document.getElementById('input_text').placeholder=l.proposalPlaceholder;
             document.getElementById('dg_output').style.display='none';
         }
         // Every displayed quote and status is constructed as text, never injected HTML.
         function updateDealCharCount() {
-            const el=document.getElementById('dg_proposal');
+            const el=document.getElementById('input_text');
             document.getElementById('dg_chars').textContent=el.value.length+' / 3500';
         }
         function invalidateDealAudit() {
-            if(dgRequestInFlight)return;
+            auditInputRevision += 1;
             document.getElementById('dg_output').style.display='none';
             document.getElementById('dg_copilot_btn').style.display='none';
             latestDealAuditMode=null;
         }
         function loadDealGuardDemo(kind='violation') {
-            const zh=currentLang==='zh';
+            // Explicit user action only: load fictional text, do NOT call either model.
             setPhase('in_deal');
             document.getElementById('dg_role').value='seller';
             document.getElementById('dg_discount').value='10';
             document.getElementById('dg_pay_dir').value='maximum';
             document.getElementById('dg_pay_days').value='45';
             document.getElementById('dg_no_exclusive').checked=true;
+            const zh=currentLang==='zh';
             const proposal=kind==='rejected'
-                ? (zh
-                    ? '买方之前要求15%折扣，但我们已经拒绝；双方同意30天账期，且不接受任何独家合作条款。'
-                    : 'The buyer previously requested a 15% discount, which we rejected. Both sides agreed to net 30 days and no exclusivity.')
-                : (zh
-                    ? '客户要求15%折扣、90天付款期限，并要求签订12个月独家合作协议。'
-                    : 'The buyer requires a 15% discount, payment terms of 90 days, and a 12-month exclusivity agreement.');
-            document.getElementById('dg_proposal').value=proposal;
+                ?(zh?'买方先前要求15%折扣，但我们明确拒绝了该条件。双方目前已约定30天付款且无独家条款。'
+                    :'The buyer previously requested a 15% discount, which we explicitly rejected. We now agreed net 30 payment and no exclusivity.')
+                :(zh?'买方要求15%折扣、90天付款期限，并要求签订12个月独家合作协议。'
+                    :'The buyer requests a 15% discount, payment terms of 90 days, and a 12-month exclusivity agreement.');
             document.getElementById('input_text').value=proposal;
+            stageDrafts.in_deal=proposal;
             updateDealCharCount();
             invalidateDealAudit();
-            // Auto-running the free rules-only preview never consumes Gemini quota.
-            runDealGuardAudit();
         }
         function addAuditFinding(parent, finding, l) {
             const card=document.createElement('div');card.className='dg-finding';
@@ -1453,7 +1454,8 @@ HTML_UI = r"""<!DOCTYPE html>
         }
         function validateDealInput(mode) {
             const l=DG_LABELS[currentLang];
-            const raw=document.getElementById('dg_proposal').value.trim();
+            if (currentPhase!=='in_deal')return l.invalidSettings;
+            const raw=document.getElementById('input_text').value.trim();
             if(!raw)return l.missing;
             if(raw.length>3500)return l.tooLong;
             const rules=getStructuredRules();
@@ -1483,6 +1485,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 status.className='dg-status unknown';status.textContent=invalid;return;
             }
             dgRequestInFlight=true;
+            const requestRevision=auditInputRevision;
             const hybridBtn=document.getElementById('dg_hybrid_btn');
             const ruleBtn=document.getElementById('dg_check_btn');
             hybridBtn.disabled=true;ruleBtn.disabled=true;
@@ -1492,7 +1495,7 @@ HTML_UI = r"""<!DOCTYPE html>
             const clock=setTimeout(()=>controller.abort(),mode==='hybrid'?29000:11000);
             try{
                 const payload={
-                    text:clientSideRedact(document.getElementById('dg_proposal').value).sanitizedText,
+                    text:clientSideRedact(document.getElementById('input_text').value).sanitizedText,
                     structured_rules:getStructuredRules()
                 };
                 if(mode==='hybrid')payload.consent_to_model_processing=true;
@@ -1503,8 +1506,10 @@ HTML_UI = r"""<!DOCTYPE html>
                 let data;
                 try{data=await response.json();}catch(e){throw new Error('HTTP '+response.status);}
                 if(!response.ok || data.error)throw new Error(l.errorCodes[data.error]||data.error||'HTTP '+response.status);
+                if(requestRevision!==auditInputRevision || currentPhase!=='in_deal')return;
                 renderDealAudit(data,mode);
             }catch(e){
+                if(requestRevision!==auditInputRevision || currentPhase!=='in_deal')return;
                 status.className='dg-status unknown';
                 status.textContent=e.name==='AbortError'?l.failedInput:l.error+e.message;
                 document.getElementById('dg_mode_used').textContent=mode==='hybrid'?l.modeHybrid:l.modeRules;
@@ -1517,13 +1522,10 @@ HTML_UI = r"""<!DOCTYPE html>
         function runDealGuardAudit(){return runDealAudit('rules');}
         function runHybridAudit(){return runDealAudit('hybrid');}
         function sendProposalToCopilot(){
-            const proposal=document.getElementById('dg_proposal').value;
-            if(!proposal.trim())return;
-            setPhase('in_deal');
-            document.getElementById('input_text').value=proposal;
-            const stage=document.getElementById('input_text');
-            stage.scrollIntoView({behavior:'smooth',block:'center'});
-            stage.focus({preventScroll:true});
+            // Same source textbox is used by both audit and strategy; no copying needed.
+            const button=document.getElementById('run_btn');
+            button.scrollIntoView({behavior:'smooth',block:'center'});
+            button.focus({preventScroll:true});
         }
 
         function setPhase(phase) {
@@ -1951,7 +1953,7 @@ HTML_UI = r"""<!DOCTYPE html>
         window.addEventListener('DOMContentLoaded', () => {
             const sysLang=(navigator.language || navigator.userLanguage || '').toLowerCase();
             setLanguage(sysLang.startsWith('en')?'en':'zh');
-            const editor=document.getElementById('dg_proposal');
+            const editor=document.getElementById('input_text');
             editor.addEventListener('input',()=>{updateDealCharCount();invalidateDealAudit();});
             ['dg_role','dg_discount','dg_pay_dir','dg_pay_days','dg_no_exclusive'].forEach(id=>{
                 const element=document.getElementById(id);
