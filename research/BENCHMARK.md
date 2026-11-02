@@ -4,13 +4,14 @@
 
 > **Current evidence is from synthetic, AI-assisted examples.** It is not independent contract accuracy, published academic research, or real customer validation.
 
-## Latest four-arm experiment · measured 2026-11-02
+## Main study: three-system comparison · measured 2026-11-02
 
-The 24-case frozen synthetic comparison completed **A (Gemini direct) = 21/24 on attempt 1 and 22/24 on repeat**, **C (DealGuard deterministic) = 11/24**, and **D (Gemini extraction + evidence validation + deterministic checks) = 22/24 in both attempts**. **B (OpenAI GPT) is still NOT_RUN**: its API key was subsequently configured, but the first real inference received `credit_balance_exhausted` (HTTP 429), confirmed by a safe diagnostic. **No GPT accuracy number exists.** The apparent hybrid advantage of one case on the first run vanished on repeat; synthetic, non-expert-validated data do not support a general performance claim.
+The portfolio's active study compares **three actually measured systems**: direct Gemini **21/24 on attempt 1 and 22/24 on repeat**, deterministic DealGuard **11/24**, and Gemini extraction + evidence validation + deterministic checks **22/24 on both attempts**. The initial hybrid advantage vanished on repeat. These AI-authored synthetic examples are not independently adjudicated and do not show a statistically established advantage. An optional fourth GPT comparison was attempted but **yielded no predictions** due to exhausted API credits; it is deliberately **out of scope**, not pending user payment.
 
-- [Latest authentic results, 4-case analysis and API limitations](FOUR_ARM_RESULTS.md)
+- [Main three-system study, two attempts and limitations](THREE_SYSTEM_RESULTS.md)
+- [Detailed historical results and failed GPT attempt](FOUR_ARM_RESULTS.md)
 - [GitHub run #41422998049 with original predictions](https://github.com/Serein131/Consigliere-ai/actions/runs/41422998049)
-- [GPT billing status and GPT-only completion workflow](FOUR_ARM_SETUP.md)
+- [Archived optional GPT setup and uncompleted attempt](FOUR_ARM_SETUP.md)
 
 ## What has actually been measured
 
@@ -27,12 +28,12 @@ Primary reports:
 - [Baseline/revision history](RESULTS.md)
 - [Original GitHub Actions evidence](https://github.com/Serein131/Consigliere-ai/actions)
 
-## Four-group experiment design (current next study)
+## Three tested systems, with optional GPT work archived
 
 | Arm | System | What it tests |
 |---|---|---|
 | A | Gemini API alone, direct rule judgments | LLM interpretation and compliance with user rules |
-| B | OpenAI GPT API alone, same task instructions | Cross-provider baseline, independently invoiced API |
+| B (archived) | OpenAI GPT API (uncompleted) | No usable predictions; not an active requirement |
 | C | Deterministic DealGuard alone | Transparent comparison but limited language coverage |
 | D | Gemini structured extraction → exact quote evidence validation → deterministic rule comparison | Hypothesis that combining semantic extraction and reliable threshold comparisons reduces errors |
 
