@@ -18,6 +18,9 @@ jobs:
       - name: Evaluate 60 synthetic audit cases (diagnostic, not a general accuracy claim)
         run: |
           python research/evaluate.py
+      - name: Evaluate separate 20-case adversarial challenge set
+        run: |
+          python research/evaluate.py --cases research/challenge_cases.json --output research/challenge_report.md --json research/challenge_report.json
       - name: Attach synthetic benchmark and failure report
         uses: actions/upload-artifact@v4
         with:
@@ -25,4 +28,6 @@ jobs:
           path: |
             research/benchmark_report.md
             research/benchmark_report.json
+            research/challenge_report.md
+            research/challenge_report.json
           retention-days: 30
