@@ -920,7 +920,7 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <!-- 1. 首席幕僚记忆库 -->
     <div class="card">
-        <strong class="card-title" id="sec1_title">📂 1. Chief of Staff Memory Bank (Reservation Values, Calendar Context & Vulnerabilities)</strong>
+        <strong class="card-title" id="sec1_title">📂 1. Commercial goals and decision preferences</strong>
         <div class="grid-2">
             <div>
                 <label id="lbl_goal">🎯 Core Goal, Budget & Timeline:</label>
@@ -928,7 +928,7 @@ HTML_UI = r"""<!DOCTYPE html>
             </div>
             <div>
                 <label id="lbl_bottom_line">🛑 Hard Bottom Lines (Nash Threat Points / BATNA):</label>
-                <input id="hard_bottom_line" value="Payment terms >= 45 days; max discount <= 10%; zero exclusive lock-in clauses." />
+                <input id="hard_bottom_line" value="Seller: payment within 45 days; max discount 10%; no exclusivity." />
             </div>
         </div>
         <label id="lbl_risk">📝 User-entered decision preferences & reminders:</label>
@@ -937,7 +937,7 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <!-- 2. 全周期三阶段切换与输入 -->
     <div class="card">
-        <strong class="card-title" id="sec2_title">🛡️ 2. Full-Cycle Negotiation Defense (No Continuous Audio Surveillance Required)</strong>
+        <strong class="card-title" id="sec2_title">🛡️ 2. Three-stage decision support</strong>
         <div class="phase-tabs">
             <button type="button" class="phase-tab" id="tab_pre_deal" onclick="setPhase('pre_deal')">
                 <span class="phase-tab-title" id="tab1_t">🕒 Stage 1: T-15m Pre-Deal</span>
@@ -1041,13 +1041,13 @@ HTML_UI = r"""<!DOCTYPE html>
         const PROFILES = {
             en: {
                 goal: "Close annual compute supply agreement under $1.2M total budget; legal sign-off by Friday.",
-                bottom: "Payment terms >= 45 days; max discount <= 10%; zero exclusive lock-in clauses.",
-                risk: "Relationship-focused; prone to anxiety and premature concessions when hit with artificial deadlines (Ultimatum Game) or future volume bait (Cheap Talk)."
+                bottom: "Seller: payment within 45 days; max discount 10%; no exclusivity.",
+                risk: "Require written confirmation, time to review, and no unapproved concessions."
             },
             zh: {
                 goal: "拿下年度算力供应合同，目标总价控制在 120 万以内，本周五前完成法务初审。",
-                bottom: "账期绝不低于 45 天；降价幅度不超过 10%；绝不接受独家排他性条款。",
-                risk: "重视长期合作关系；当对方抛出‘限时最后通牒（Ultimatum）’或‘明年大单画饼（Cheap Talk）’时容易焦虑让步。"
+                bottom: "卖方：期望45天内收款；折扣不超过10%；禁止独家合作。",
+                risk: "优先书面确认，预留审阅时间；未经同意不作承诺。"
             }
         };
 
@@ -1084,12 +1084,12 @@ HTML_UI = r"""<!DOCTYPE html>
 
         const PILLAR_TITLES = {
             en: {
-                pre_deal: ["🎯 Opening Anchor & Frame", "🛡️ Predicted Traps & Cheap Talk", "🚨 Panic Circuit Breaker"],
+                pre_deal: ["🎯 Opening Anchor & Frame", "🛡️ Predicted Traps & Cheap Talk", "🚨 Decision reminder"],
                 in_deal: ["📌 Verified Facts", "♟️ Strategic Inferences (Game Theory)", "❓ Unknowns to Probe"],
                 post_deal: ["✅ Defended Ground", "⚠️ Verbal Slippage & Exposure", "🔒 Quid Pro Quo Conditioning"]
             },
             zh: {
-                pre_deal: ["🎯 先发制人开场锚点", "🛡️ 预判陷阱与廉价信号识别", "🚨 性格弱点防冲动熔断动作"],
+                pre_deal: ["🎯 先发制人开场锚点", "🛡️ 预判陷阱与廉价信号识别", "🚨 决策提醒与待核查事项"],
                 in_deal: ["📌 客观事实 (Verified Facts)", "♟️ 博弈推断 (Strategic Inferences)", "❓ 未知盲区 (Unknowns to Probe)"],
                 post_deal: ["✅ 成功守住的筹码阵地", "⚠️ 口头妥协漏洞与风险敞口", "🔒 对等交换条件锁定 (Quid Pro Quo)"]
             }
@@ -1315,69 +1315,6 @@ HTML_UI = r"""<!DOCTYPE html>
             alert(currentLang === 'zh' ? '会话链路记忆已清空重置。' : 'Session memory chain has been reset.');
         }
 
-        function renderIterationTable() {
-            const container = document.getElementById('iteration_table_container');
-            if (currentLang === 'zh') {
-                container.innerHTML = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>迭代版本</th>
-                                <th>发现的失效表现 / 测试者真实反馈</th>
-                                <th>博弈论与工程级重构举措</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>v1.0 → v2.0</strong></td>
-                                <td>误报率 100%：将常规友善的确认邮件也全量判定为高风险陷阱。</td>
-                                <td>引入 <code>SAFE</code> 基线与纳什合作检验机制，验证良性输入零误报。</td>
-                            </tr>
-                            <tr>
-                                <td><strong>v2.0 → v3.2</strong></td>
-                                <td>单句反问过于单薄，客观事实与推测混杂；正则误伤打码了“60秒”。</td>
-                                <td>强制执行认识论三元拆解（事实/推断/未知），修复正则保护时间词，加入中英自适应。</td>
-                            </tr>
-                            <tr>
-                                <td><strong>v3.2 → v4.6</strong></td>
-                                <td>长篇发言转写时前半句被索引覆盖丢弃；暗号盲打在触摸屏上极不实用。</td>
-                                <td><strong>彻底修复 Web Speech API 全量结果分块拼接 Bug（由 0 索引全量累加）</strong>；移除鸡肋暗号模式，聚焦硬件降噪流式语音捕获（支持2~3分钟长发言与4.5秒自然停顿检测）；后端升级为极速 <code>gemini-3.5-flash-lite</code>。</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-            } else {
-                container.innerHTML = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Iteration</th>
-                                <th>Failure Mode / Tester Feedback</th>
-                                <th>Engineering & Game-Theoretic Fix</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>v1.0 → v2.0</strong></td>
-                                <td>100% false-positive rate: flagged even benign agreement emails as hostile traps.</td>
-                                <td>Added <code>SAFE</code> baseline & Nash alignment check; verified zero false alarms on benign inputs.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>v2.0 → v3.2</strong></td>
-                                <td>Single-sentence output mixed up stated facts with AI speculation; regex accidentally redacted "60s".</td>
-                                <td>Enforced Epistemic Game Theory split (Facts / Inferences / Unknowns), refined regex to protect time units, and added EN/ZH auto-adaptation.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>v3.2 → v4.6</strong></td>
-                                <td>Prior speech chunks overwritten by resultIndex reset; shorthand created physical friction on touchscreens.</td>
-                                <td><strong>Completely fixed Web Speech API chunk aggregation bug (accumulating from index 0 across all chunks)</strong>; removed shorthand mode in favor of noise-suppressed continuous STT and migrated to <code>gemini-3.5-flash-lite</code>.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-            }
-        }
-
         function setLanguage(lang) {
             currentLang = lang;
             updateDealGuardLabels();
@@ -1390,21 +1327,21 @@ HTML_UI = r"""<!DOCTYPE html>
             document.getElementById('voice_lang').value = lang === 'en' ? 'en-US' : 'zh-CN';
 
             if (lang === 'zh') {
-                document.getElementById('subtitle_text').innerText = "从根源化解录音难题：战前15分钟沙盘预警 (70%) • 硬件降噪战中干预 (20%) • 战后60秒口述复盘与跟进邮件 (10%)";
-                document.getElementById('sec1_title').innerText = "📂 1. 首席幕僚记忆库（保留点底线 BATNA、日程背景与性格弱点档案）";
+                document.getElementById('subtitle_text').innerText = "明确底线 · 审计交易条款 · 选择谈判方案";
+                document.getElementById('sec1_title').innerText = "📂 1. 商业目标与决策偏好";
                 document.getElementById('lbl_goal').innerText = "🎯 核心目标、预算与时间线：";
                 document.getElementById('lbl_bottom_line').innerText = "🛑 绝对底线 (纳什谈判威胁点 / BATNA)：";
-                document.getElementById('lbl_risk').innerText = "🧠 历史妥协习惯与性格盲区档案：";
-                document.getElementById('sec2_title').innerText = "🛡️ 2. 全周期三阶段博弈防线（无需现场非法全程录音）";
+                document.getElementById('lbl_risk').innerText = "🧠 自行填写的决策偏好与提醒：";
+                document.getElementById('sec2_title').innerText = "🛡️ 2. 三阶段交易决策辅助";
                 document.getElementById('tab1_t').innerText = "🕒 阶段1：战前15分钟预警";
-                document.getElementById('tab1_d').innerText = "短信唤醒、对手套路沙盘与防冲动锚定";
+                document.getElementById('tab1_d').innerText = "会议策略准备与提醒文本";
                 document.getElementById('tab2_t').innerText = "⚡ 阶段2：战中无痕交锋";
-                document.getElementById('tab2_d').innerText = "硬件降噪长语音捕获 / 事实·推断·未知拆解";
+                document.getElementById('tab2_d').innerText = "可选语音转写 / 事实·推断·未知拆解";
                 document.getElementById('tab3_t').innerText = "🎙️ 阶段3：战后60秒复盘";
                 document.getElementById('tab3_d').innerText = "口述得失审计、口头让步找补与跟进邮件";
-                document.getElementById('lbl_mode').innerText = "本地语音转写与麦克风降噪通道：";
+                document.getElementById('lbl_mode').innerText = "浏览器语音转写（依赖设备及浏览器）：";
                 document.getElementById('opt_lang_en').innerText = "🎙️ 麦克风通道：English (US / Global) + Hardware Noise Suppression";
-                document.getElementById('opt_lang_zh').innerText = "🎙️ 麦克风通道：中文 (普通话) + 硬件级声学降噪 DSP";
+                document.getElementById('opt_lang_zh').innerText = "🎙️ 中文语音转写（依赖浏览器）";
                 document.getElementById('lbl_input_text').innerText = "当前阶段输入（战前对手背景 / 战中对手发言转写或纪要 / 战后60秒语音口述）：";
                 document.getElementById('mic_btn').innerText = "🎤 开启降噪语音捕获 (对手发言时点击)";
                 document.getElementById('run_btn').innerText = "⚡ 启动全周期博弈推演";
@@ -1412,27 +1349,24 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('btn_copy_draft').innerText = "📋 复制全文/跟进邮件";
                 document.getElementById('btn_mail_client').innerText = "✉️ 唤起本地邮件客户端";
 
-                document.getElementById('sec3_title').innerText = "🔍 3. 博弈论架构、隐私验证与工程迭代记录";
-                document.getElementById('privacy_desc').innerHTML = `
-                    • <strong>为何全周期胜过现场录音：</strong>在董事会或商务谈判现场秘密录音不仅违反双向知情同意法，且严重破坏互信。Consigliere AI 通过<strong>阶段 1（战前 15 分钟沙盘）</strong>、<strong>阶段 2（降噪长语音捕获）</strong>与<strong>阶段 3（战后 60 秒口述复盘）</strong>串联，实现 100% 战术防御覆盖且零录音风险。<br>
-                    • <strong>长语音捕获与贝叶斯容错：</strong>前端激活 Web Audio 硬件降噪 DSP 并支持持续多分钟发言，结合后端基于记忆库档案的语义纠偏，有效防御杂音与同音转写误差。
-                `;
+                document.getElementById('sec3_title').innerText = "🔍 3. 技术架构、隐私限制与测试";
+                document.getElementById('privacy_desc').textContent = '使用结构化规则与 AI 建议辅助交易决策。正则脱敏不能确保完全删除敏感信息；语音识别可能依赖浏览器或服务商。须获得必要录音同意，仅使用合成案例演示。';
             } else {
-                document.getElementById('subtitle_text').innerText = "Solving Recording Dilemma: T-15m Wargame • Noise-Suppressed In-Deal • T+0m Debrief";
-                document.getElementById('sec1_title').innerText = "📂 1. Chief of Staff Memory Bank (Reservation Values, Calendar Context & Vulnerabilities)";
+                document.getElementById('subtitle_text').innerText = "Set limits · Verify terms · Explore options";
+                document.getElementById('sec1_title').innerText = "📂 1. Commercial goals and decision preferences";
                 document.getElementById('lbl_goal').innerText = "🎯 Core Goal, Budget & Timeline:";
                 document.getElementById('lbl_bottom_line').innerText = "🛑 Hard Bottom Lines (Nash Threat Points / BATNA):";
-                document.getElementById('lbl_risk').innerText = "🧠 Historical Commitments & Behavioral Vulnerability Profile:";
-                document.getElementById('sec2_title').innerText = "🛡️ 2. Full-Cycle Negotiation Defense (No Continuous Audio Surveillance Required)";
+                document.getElementById('lbl_risk').innerText = "🧠 User-entered decision preferences and reminders:";
+                document.getElementById('sec2_title').innerText = "🛡️ 2. Three-stage decision support";
                 document.getElementById('tab1_t').innerText = "🕒 Stage 1: T-15m Pre-Deal";
-                document.getElementById('tab1_d').innerText = "SMS Wake-Up Alert & Trap Wargaming (70% of Win)";
+                document.getElementById('tab1_d').innerText = "Strategy preparation and reminder draft";
                 document.getElementById('tab2_t').innerText = "⚡ Stage 2: Live In-Deal";
-                document.getElementById('tab2_d').innerText = "Hardware Noise-Suppressed STT / Tactical Triage";
+                document.getElementById('tab2_d').innerText = "Optional speech transcript and tactical review";
                 document.getElementById('tab3_t').innerText = "🎙️ Stage 3: T+0m Debrief";
                 document.getElementById('tab3_d').innerText = "60s Voice Audit vs. Bottom Lines & Follow-Up Email";
-                document.getElementById('lbl_mode').innerText = "Local Speech Recognition & Microphone Channel:";
-                document.getElementById('opt_lang_en').innerText = "🎙️ Microphone Channel: English (US / Global) + Hardware Noise Suppression";
-                document.getElementById('opt_lang_zh').innerText = "🎙️ 麦克风通道：中文 (普通话) + 硬件级声学降噪 DSP";
+                document.getElementById('lbl_mode').innerText = "Optional speech transcription (browser-dependent):";
+                document.getElementById('opt_lang_en').innerText = "🎙️ English transcription (browser-dependent)";
+                document.getElementById('opt_lang_zh').innerText = "🎙️ 中文语音转写（依赖浏览器）";
                 document.getElementById('lbl_input_text').innerText = "Stage Input (Meeting Context / Live Opponent Speech / 60s Post-Deal Voice Memo):";
                 document.getElementById('mic_btn').innerText = "🎤 Start Noise-Suppressed Capture";
                 document.getElementById('run_btn').innerText = "⚡ Execute Game-Theoretic Engine";
@@ -1440,16 +1374,13 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('btn_copy_draft').innerText = "📋 Copy Full Draft / Email";
                 document.getElementById('btn_mail_client').innerText = "✉️ Open in Mail Client";
 
-                document.getElementById('sec3_title').innerText = "🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log";
-                document.getElementById('privacy_desc').innerHTML = `
-                    • <strong>Why Full-Cycle Beats Eavesdropping:</strong> Recording boardroom audio violates consent laws and creates hostility. By chaining <strong>Stage 1 (T-15m Wargame)</strong>, <strong>Stage 2 (Continuous STT)</strong>, and <strong>Stage 3 (60s Post-Deal Voice Debrief)</strong> in local memory, Consigliere AI delivers end-to-end tactical defense with zero continuous audio recording.<br>
-                    • <strong>Hardware Noise Suppression & Bayesian Repair:</strong> Front-end requests system CoreAudio noise suppression DSP and supports multi-minute continuous speech, combined with prompt-level fuzzy correction using pre-deal memory.
-                `;
+                document.getElementById('sec3_title').innerText = "🔍 3. Architecture, privacy limitations and tests";
+                document.getElementById('privacy_desc').textContent = 'Decision support only. Regex redaction is incomplete; speech recognition may depend on browser/provider services. Obtain applicable recording consent and use synthetic data for demos.';
             }
 
             updatePillarHeaders();
             updateSessionUI();
-            renderIterationTable();
+            // Previous unsourced version metrics removed.
             renderPresets();
             const firstKey = Object.keys(STAGE_PRESETS[currentLang][currentPhase])[0];
             loadPreset(firstKey);
@@ -1708,7 +1639,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 let counterPrefix = '';
                 let draftPrefix = '';
                 if (currentPhase === 'pre_deal') {
-                    counterPrefix = currentLang === 'zh' ? '📱 战前15分钟短信唤醒摘要：' : '📱 T-15m SMS Wake-Up Alert: ';
+                    counterPrefix = currentLang === 'zh' ? '📱 会前提醒草稿：' : '📱 Pre-meeting reminder draft: ';
                     draftPrefix = currentLang === 'zh' ? '📋 会前议程设定与先发锚定话术：\n' : '📋 Pre-Meeting Agenda Framing Opener:\n';
                 } else if (currentPhase === 'in_deal') {
                     counterPrefix = currentLang === 'zh' ? '🎯 建议当场反问（破局话术）：' : '🎯 Immediate Live Counter-Question: ';
