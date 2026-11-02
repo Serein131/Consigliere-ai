@@ -1,0 +1,81 @@
+name: Four-Arm Evidence-Grounded Negotiation Study
+on:
+  push:
+    branches:
+      - feature/four-arm-research-portfolio-20261102
+    paths:
+      - '.github/workflows/four-arm-research.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_MODEL: gemini-3.5-flash-lite
+      OPENAI_MODEL: gpt-6-luna
+      CASES: research/cases/four_arm_frozen_24.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate code and freeze the synthetic case file
+        id: bootstrap
+        run: |
+          python -m py_compile app.py dealguard.py research/evidence_hybrid.py research/run_four_arms.py research/evaluate_four_arms.py
+          python -m unittest discover -s tests -v
+          echo 'SHA256 of frozen cases, parser and hybrid:'
+          sha256sum "$CASES" dealguard.py research/evidence_hybrid.py research/run_four_arms.py
+          mkdir -p research/arm_outputs
+      - name: Check provider secret availability without printing values
+        id: credentials
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            echo 'gemini=true' >> "$GITHUB_OUTPUT"
+            echo 'Gemini API key available.'
+          else
+            echo 'gemini=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::GEMINI_API_KEY absent; A and D will not run.'
+          fi
+          if [ -n "$OPENAI_API_KEY" ]; then
+            echo 'openai=true' >> "$GITHUB_OUTPUT"
+            echo 'OpenAI API key available.'
+          else
+            echo 'openai=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::OPENAI_API_KEY absent; B/GPT will show NOT_RUN, not invented results.'
+          fi
+      - name: C - Frozen deterministic DealGuard (no model API)
+        run: |
+          python research/run_four_arms.py --cases "$CASES" --arm rules --output research/arm_outputs/rules.json
+      - name: A - Direct Gemini on frozen 24 scenarios
+        if: steps.credentials.outputs.gemini == 'true'
+        run: |
+          python research/run_four_arms.py --cases "$CASES" --arm gemini --sleep 7 --output research/arm_outputs/gemini.json
+      - name: D - Evidence-grounded Gemini extraction and deterministic audit
+        if: steps.credentials.outputs.gemini == 'true'
+        run: |
+          python research/run_four_arms.py --cases "$CASES" --arm hybrid --sleep 7 --output research/arm_outputs/hybrid.json
+      - name: B - Direct OpenAI GPT on identical rule task
+        if: steps.credentials.outputs.openai == 'true'
+        run: |
+          python research/run_four_arms.py --cases "$CASES" --arm gpt --sleep 3 --output research/arm_outputs/gpt.json
+      - name: Score actual completed arms (NOT_RUN for unavailable providers)
+        if: always() && steps.bootstrap.outcome == 'success'
+        run: |
+          python research/evaluate_four_arms.py --cases "$CASES" --results-dir research/arm_outputs --output-prefix research/four_arm_measured
+      - name: Preserve real provider predictions, evidence and case-level failures
+        if: always() && steps.bootstrap.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-arm-measured-and-provider-availability
+          path: |
+            research/arm_outputs/*.json
+            research/four_arm_measured.json
+            research/four_arm_measured.md
+            research/four_arm_measured.csv
+          retention-days: 30
+          if-no-files-found: warn
