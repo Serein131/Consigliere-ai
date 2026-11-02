@@ -62,18 +62,25 @@ def classify(case, key, model):
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--limit",type=int,default=10,
-                    help="Number of cases; start small to control cost (max 60)")
+                    help="Number of cases to run; start small to control cost")
+    ap.add_argument("--cases",default=str(ROOT/"research"/"synthetic_cases.json"),
+                    help="JSON dataset with a cases array")
     ap.add_argument("--sleep",type=float,default=2.0,
                     help="Delay between requests to avoid rate limits")
     ap.add_argument("--output",default=str(ROOT/"research"/"baseline_predictions.json"))
     args=ap.parse_args()
-    if not (1<=args.limit<=60):
-        ap.error("--limit must be 1..60")
+    source=json.loads(pathlib.Path(args.cases).read_text(encoding="utf-8"))
+    if not isinstance(source,dict) or not isinstance(source.get("cases"),list):
+        ap.error("--cases must contain a list of test cases")
+    if not (1<=args.limit<=len(source["cases"])):
+        ap.error("--limit must be 1..dataset case count")
     api_key=(os.environ.get("GEMINI_API_KEY") or "").strip()
     if not api_key:
         ap.error("Set GEMINI_API_KEY in your local environment; do NOT paste it into GitHub")
     model=os.environ.get("GEMINI_MODEL","gemini-3.5-flash-lite").strip()
-    cases=json.loads((ROOT/"research"/"synthetic_cases.json").read_text(encoding="utf-8"))["cases"][:args.limit]
+    cases=source["cases"][:args.limit]
+    if len({case["id"] for case in cases})!=len(cases):
+        ap.error("Dataset has duplicate case IDs")
     done={}
     output=pathlib.Path(args.output)
     if output.exists():
