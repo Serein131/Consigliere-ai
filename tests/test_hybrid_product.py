@@ -166,14 +166,32 @@ class HybridEndpointTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json["violation_count"], 3)
 
-    def test_homepage_exposes_both_modes_and_form(self):
+    def test_homepage_exposes_unified_three_stages_and_both_audit_modes(self):
         response = self.client.get("/")
         page = response.get_data(as_text=True)
         self.assertEqual(response.status_code, 200)
-        for marker in ("dg_proposal", "dg_hybrid_btn", "dg_check_btn",
-                       "dg_consent", "dg_evidence", "runHybridAudit",
-                       "sendProposalToCopilot", "dg_reject_btn"):
+        for marker in ("v5.3", 'id="stage_prepare"', 'id="stage_live_audit"',
+                       'id="tab_pre_deal"', 'id="tab_in_deal"', 'id="tab_post_deal"',
+                       'id="input_text"', 'id="mic_consent"', 'id="agent_consent"',
+                       "dg_hybrid_btn", "dg_check_btn", "dg_consent", "dg_evidence",
+                       "runHybridAudit", "toggleMic", "dg_reject_btn"):
             self.assertIn(marker, page)
+        self.assertNotIn('id="dg_proposal"', page)
+        self.assertEqual(page.count('<textarea '), 1)
+        self.assertEqual(page.count('id="input_text"'), 1)
+
+    def test_speech_transcription_does_not_automatically_call_ai(self):
+        response = self.client.get("/")
+        page = response.get_data(as_text=True)
+        script = page.split("<script>", 1)[1].split("</script>", 1)[0]
+        mic = script.split("async function toggleMic()", 1)[1].split(
+            "async function runAgent()", 1
+        )[0]
+        self.assertNotIn("runAgent()", mic)
+        self.assertNotIn("runHybridAudit()", mic)
+        self.assertNotIn("runDealGuardAudit()", mic)
+        self.assertIn("mic_consent", mic)
+        self.assertIn("stopMicInternal()", mic)
 
 if __name__ == "__main__":
     unittest.main()
