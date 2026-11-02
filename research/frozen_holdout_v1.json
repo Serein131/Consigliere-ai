@@ -191,10 +191,8 @@
       "expected_rule_status": {
         "payment_days": "UNKNOWN"
       },
-      "expected_commercial_risks": [
-        "long_receivables"
-      ],
-      "annotation_note": "Current terms unknown; historical request should not be treated as active cashflow risk. Advisory label may require adjudication."
+      "expected_commercial_risks": [],
+      "annotation_note": "Rejected 75-day term leaves current payment unknown; should not raise an active cashflow risk."
     },
     {
       "id": "HLD-014",
@@ -209,8 +207,10 @@
       "expected_rule_status": {
         "payment_days": "VIOLATION"
       },
-      "expected_commercial_risks": [],
-      "annotation_note": "Chinese reordered time expression."
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": "75-day seller receivable warrants a distinct commercial-review flag."
     },
     {
       "id": "HLD-015",
@@ -628,5 +628,6 @@
       ],
       "annotation_note": "Two independent commercial risk flags."
     }
-  ]
+  ],
+  "label_review": "Manual pre-evaluation label consistency corrections: HLD-013 risk [] because rejected; HLD-014 long_receivables because live 75-day term. No system results inspected before this edit."
 }
