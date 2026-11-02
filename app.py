@@ -100,12 +100,15 @@ def audit_only():
         return jsonify({"error": "Expected a JSON object"}), 400
     text = str(payload.get("text") or "")[:12000]
     rules = str(payload.get("hard_bottom_line") or "")[:2000]
-    if not text.strip() or not rules.strip():
-        return jsonify({"error": "Both text and hard_bottom_line are required."}), 400
+    if not text.strip():
+        return jsonify({"error": "Deal proposal text is required."}), 400
+    if not rules.strip() and payload.get("structured_rules") is None:
+        return jsonify({"error": "Configure structured rules or hard_bottom_line."}), 400
     # Percentages / durations must remain measurable; identifiers and money are scrubbed.
     return jsonify(check_deal(
         server_fallback_redact(text)["sanitized_text"],
-        server_fallback_redact(rules)["sanitized_text"]
+        server_fallback_redact(rules)["sanitized_text"],
+        payload.get("structured_rules")
     ))
 
 @app.route("/analyze", methods=["POST"])
@@ -126,7 +129,7 @@ def analyze_negotiation():
 
     redaction_result = server_fallback_redact(incoming_text)
     sanitized_text = redaction_result["sanitized_text"]
-    dealguard_audit = check_deal(sanitized_text, hard_bottom_line)
+    dealguard_audit = check_deal(sanitized_text, hard_bottom_line, payload.get("structured_rules"))
     user_goal = server_fallback_redact(user_goal)["sanitized_text"]
     hard_bottom_line = server_fallback_redact(hard_bottom_line)["sanitized_text"]
     risk_preference = server_fallback_redact(risk_preference)["sanitized_text"]
@@ -162,22 +165,22 @@ You MUST cross-reference the input with the User's Strategic Profile (Goals, Bot
 
     phase_instructions = {
         "pre_deal": """CURRENT STAGE: PHASE 1 — T-15m PRE-DEAL BRIEFING & WARGAMING (战前15分钟沙盘预警).
-Objective: 70% of negotiations are won before speaking. Arm the user psychologically and game-theoretically before entering the room.
+Objective: Prepare verifiable facts, constraints, questions and a measured opening. Do not imply a proven win rate.
 - In 'trap_or_intent': Identify the most likely Game-Theoretic Playbook the opponent will use (e.g. Ultimatum Game / Artificial Urgency / Cheap Talk Future Bait).
 - In 'triggered_rule': Cite the exact reservation value (BATNA / Hard Bottom Line) most at risk today and lock it.
 - In 'box1_text': [Opening Anchor & Framing]: Proactive agenda frame or opening anchor the user should set in the first 2 minutes.
 - In 'box2_text': [Predicted Traps & Signaling Test]: Specific traps to anticipate and how to test whether opponent claims are 'Cheap Talk' vs. 'Costly Signals'.
-- In 'box3_text': [Behavioral Circuit Breaker]: Concrete pause/delay tactic tailored to user's vulnerability.
-- In 'counter_question': [T-15m SMS Wake-Up Alert]: Ultra-punchy 1-sentence SMS alert sent to user's phone 15 mins before entering.
+- In 'box3_text': [Decision Reminder]: Pause or verification steps grounded in user-entered preferences.
+- In 'counter_question': [Pre-Meeting Reminder Draft]: One concise reminder for the user to copy; do not claim it was delivered by SMS.
 - In 'draft_reply': [Pre-Meeting Agenda Opener]: Crisp opening statement to establish leverage before sitting down.""",
 
         "in_deal": """CURRENT STAGE: PHASE 2 — IN-DEAL LIVE INTERVENTION (战中无痕交锋与三元拆解).
-Objective: The user captured live counterparty demands or speech transcripts. Apply Nash Bargaining, Cheap Talk filtering, and Epistemic Game Theory without illegal continuous recording.
-- NO FALSE POSITIVES: If counterparty agrees to terms, set 'risk_level' to 'SAFE' and 'trap_or_intent' to 'Constructive Alignment' (良性推进).
-- If counterparty attempts aggressive price cuts (>10%), demands exclusivity, compresses payment terms (<45d), or imposes artificial deadlines, set 'risk_level' to 'CRITICAL' or 'MEDIUM'.
+Objective: Analyze voluntarily provided text or user-controlled transcripts. Distinguish explicitly stated terms, hypotheses and unknowns.
+- Do not infer a safe transaction merely because the other party is cooperative. Explicitly check rule evidence.
+- Use only the configured structured thresholds and deterministic audit for rule conflicts; never assume fixed 10% or 45-day constraints.
 - In 'triggered_rule': Cite which exact Goal, Budget, or Hard Bottom Line was triggered or satisfied.
 - In 'box1_text': [Verified Facts]: Objective terms explicitly stated by counterparty (zero speculation).
-- In 'box2_text': [Strategic Inferences]: Opponent's hidden leverage play, information asymmetry, or Cheap Talk bluff.
+- In 'box2_text': [Strategic Inferences]: Clearly labeled alternative interpretations; do not claim knowledge of the opponent's intentions.
 - In 'box3_text': [Unknowns to Probe]: Critical missing variables required to test their bluff or verify constraints.
 - In 'counter_question': [Live Counter-Question (<25 words)]: Sharp, non-defensive question to say out loud right now to flip leverage.
 - In 'draft_reply': [Tactical Reply / Live Pivot]: Complete, poised response ready to speak or negotiate.""",
@@ -203,13 +206,13 @@ Objective: The user dictated a 60s summary right after the meeting. Cross-examin
         if session_context.get("in_deal"):
             session_history_str += f"\n[STAGE 2 IN-DEAL HISTORY (Live Context)]: {json.dumps(session_context['in_deal'], ensure_ascii=False)}"
 
-    system_instruction = f"""You are Consigliere AI (v4.6), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
-You replace illegal/intrusive full-room continuous audio surveillance with a 3-stage cognitive defense architecture.
+    system_instruction = f"""You are Consigliere AI (v5.1), an evidence-aware commercial negotiation decision assistant.
+You support user-controlled, consent-based workflows; never assume recording is illegal or automatically private. You are not a lawyer.
 
 USER STRATEGIC PROFILE (MEMORY BANK):
 - [Core Goal & Budget]: {user_goal}
-- [Hard Bottom Lines (Reservation Values / BATNA)]: {hard_bottom_line}
-- [Behavioral Vulnerabilities & Risk Profile]: {risk_preference}
+- [Free-text context, not machine-enforced thresholds]: {hard_bottom_line}
+- [User-entered decision preferences]: {risk_preference}
 
 {asr_fuzzy_repair_instruction}
 
@@ -221,17 +224,19 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
 {{
   "risk_level": "SAFE, LOW, MEDIUM, or CRITICAL",
   "trap_or_intent": "Classification or audit verdict",
-  "triggered_rule": "Explicit reference to user's Goal, Bottom Line, or Vulnerability",
+  "triggered_rule": "Evidence-based reference to user-configured constraints or unknowns",
   "box1_text": "Pillar 1 Content",
   "box2_text": "Pillar 2 Content",
   "box3_text": "Pillar 3 Content",
-  "counter_question": "Immediate counter-question or SMS wake-up alert (<25 words)",
+  "counter_question": "Immediate counter-question or copyable reminder draft (<25 words)",
   "draft_reply": "Complete follow-up email, tactical reply draft, or pre-meeting framing note"
 }}"""
 
     user_prompt = f"[{phase.upper()} INPUT (Sanitized)]: {sanitized_text}{session_history_str}"
     user_prompt += "\n[DETERMINISTIC DEALGUARD AUDIT]: " + json.dumps(dealguard_audit, ensure_ascii=False)
     user_prompt += "\nExplicit audit findings take precedence. UNKNOWN does not mean SAFE. Never invent terms or assert inferred motives as facts."
+    user_prompt += "\nSeparate rule compliance from commercial risk. A passed explicit rule does not imply a good or legally safe deal. Treat REJECTED/HISTORICAL terms as non-binding and seek clarification for contradictions."
+    user_prompt += "\nThis is decision support only; no legal advice or contract execution."
 
     primary_model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     candidate_models = [primary_model, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3-flash-preview"]
@@ -293,6 +298,8 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
             tactical_output["triggered_rule"] = prefix + " " + str(tactical_output.get("triggered_rule",""))
         elif dealguard_audit["assessment"] == "UNKNOWN" and tactical_output["risk_level"] == "SAFE":
             tactical_output["risk_level"] = "LOW"
+        if dealguard_audit["commercial_risks"] and tactical_output["risk_level"] == "SAFE":
+            tactical_output["risk_level"] = "LOW"
         latency_ms = round((time.perf_counter() - start_time) * 1000)
 
         return jsonify({
@@ -312,7 +319,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v5.0 | Founder DealGuard — Auditable Decision Intelligence</title>
+    <title>Consigliere AI v5.1 | Founder DealGuard — Auditable Decision Intelligence</title>
     <style>
         :root {
             --bg-canvas: #f8fafc;
@@ -845,7 +852,12 @@ HTML_UI = r"""<!DOCTYPE html>
         .dg-finding-state.violation{color:#b91c1c}.dg-finding-state.unknown{color:#a16207}.dg-finding-state.pass{color:#047857}
         .dg-finding-evidence{font-size:11px;color:#475569;line-height:1.55;margin-top:6px;overflow-wrap:anywhere}
         .dg-footnote{font-size:11px;color:#64748b;margin-top:12px;line-height:1.6}
-        @media(max-width:680px){
+        .dg-config{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin:14px 0}
+        .dg-config label{margin:0 0 5px;font-size:12px}.dg-config select,.dg-config input:not([type=checkbox]){padding:9px 10px;font-size:13px}
+        .dg-config input[type=checkbox]{width:22px;height:22px}
+        .dg-notice{font-size:12px;color:#64748b}.dg-risk{padding:12px;margin-top:12px;border:1px solid #f3d5a7;border-radius:12px;background:#fffbeb}
+        .dg-risk strong{color:#92400e;font-size:13px}.dg-risk p{font-size:12px;margin:6px 0;color:#78350f}
+        @media(max-width:680px){.dg-config{grid-template-columns:1fr 1fr}
           .dg-hero{padding:23px 19px;border-radius:15px}
           .dg-panel{padding:18px 16px}
           .dg-findings{grid-template-columns:1fr}
@@ -856,8 +868,8 @@ HTML_UI = r"""<!DOCTYPE html>
 <body>
     <div class="header-row">
         <div>
-            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.0 · Founder DealGuard</span></div>
-            <div class="subtitle" id="subtitle_text">Solving Recording Dilemma: T-15m Wargame • Noise-Suppressed In-Deal • T+0m Debrief</div>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.1 · Founder DealGuard</span></div>
+            <div class="subtitle" id="subtitle_text">Set limits · Verify terms · Explore options</div>
         </div>
         <div class="lang-switch">
             <button type="button" class="lang-btn" id="btn_en" onclick="setLanguage('en')">🇺🇸 English</button>
@@ -883,7 +895,15 @@ HTML_UI = r"""<!DOCTYPE html>
             <h2 id="dg_panel_title">01 / Independent deal audit</h2>
             <span class="dg-label" id="dg_no_llm">NO GEMINI CALL REQUIRED</span>
         </div>
-        <p id="dg_panel_desc">Uses your Hard Bottom Lines and the proposal text below. Detects explicit discount, payment-window, and exclusivity rule conflicts. The rules are inspectable and conservative.</p>
+        <p id="dg_panel_desc">Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.</p>
+        <div class="dg-config">
+            <div><label for="dg_role" id="dg_role_label">Deal perspective</label><select id="dg_role"><option value="seller">Seller · getting paid</option><option value="buyer">Buyer · paying</option><option value="unspecified">Unspecified</option></select></div>
+            <div><label for="dg_discount" id="dg_discount_label">Maximum discount (%)</label><input type="number" id="dg_discount" min="0" max="100" value="10"></div>
+            <div><label for="dg_pay_dir" id="dg_pay_label">Payment term rule</label><select id="dg_pay_dir"><option value="maximum">At most (days)</option><option value="minimum">At least (days)</option><option value="none">No payment rule</option></select></div>
+            <div><label for="dg_pay_days" id="dg_days_label">Payment days threshold</label><input type="number" id="dg_pay_days" min="0" max="3650" value="45"></div>
+            <div><label for="dg_no_exclusive" id="dg_exclusive_label">Prohibit exclusivity</label><input type="checkbox" id="dg_no_exclusive" checked></div>
+        </div>
+        <p class="dg-notice" id="dg_config_note">Structured thresholds control the audit. Free-text notes below provide context but do not create additional enforced rules.</p>
         <div class="dg-actions">
             <button type="button" class="dg-primary" onclick="runDealGuardAudit()" id="dg_check_btn">◆ Check deal constraints</button>
             <button type="button" class="dg-secondary" onclick="loadDealGuardDemo()" id="dg_demo_btn">Load 3-rule stress test</button>
@@ -894,38 +914,40 @@ HTML_UI = r"""<!DOCTYPE html>
                 <span class="dg-count" id="dg_counter"></span>
             </div>
             <div class="dg-findings" id="dg_findings"></div>
+            <div class="dg-risk" id="dg_risk" style="display:none"><strong id="dg_risk_title">Commercial risk review — separate from rules</strong><div id="dg_risk_findings"></div></div>
+            <div id="dg_rule_warnings" class="dg-footnote"></div>
             <div class="dg-footnote" id="dg_footnote">A rule audit cannot certify contractual safety or replace qualified legal and financial review.</div>
         </div>
     </section>
 
     <!-- 1. 首席幕僚记忆库 -->
     <div class="card">
-        <strong class="card-title" id="sec1_title">📂 1. Chief of Staff Memory Bank (Reservation Values, Calendar Context & Vulnerabilities)</strong>
+        <strong class="card-title" id="sec1_title">📂 1. Commercial goals and decision preferences</strong>
         <div class="grid-2">
             <div>
                 <label id="lbl_goal">🎯 Core Goal, Budget & Timeline:</label>
                 <input id="user_goal" value="Close annual compute supply agreement under $1.2M total budget; legal sign-off by Friday." />
             </div>
             <div>
-                <label id="lbl_bottom_line">🛑 Hard Bottom Lines (Nash Threat Points / BATNA):</label>
-                <input id="hard_bottom_line" value="Payment terms >= 45 days; max discount <= 10%; zero exclusive lock-in clauses." />
+                <label id="lbl_bottom_line">📝 Other deal notes (not machine-enforced):</label>
+                <input id="hard_bottom_line" value="Seller: payment within 45 days; max discount 10%; no exclusivity." />
             </div>
         </div>
-        <label id="lbl_risk">🧠 Historical Commitments & Behavioral Vulnerability Profile:</label>
-        <input id="risk_preference" value="Relationship-focused; prone to anxiety and premature concessions when hit with artificial deadlines (Ultimatum Game) or future volume bait (Cheap Talk)." />
+        <label id="lbl_risk">📝 User-entered decision preferences & reminders:</label>
+        <input id="risk_preference" value="Require written confirmation, time to review, and no unapproved concessions." />
     </div>
 
     <!-- 2. 全周期三阶段切换与输入 -->
     <div class="card">
-        <strong class="card-title" id="sec2_title">🛡️ 2. Full-Cycle Negotiation Defense (No Continuous Audio Surveillance Required)</strong>
+        <strong class="card-title" id="sec2_title">🛡️ 2. Three-stage decision support</strong>
         <div class="phase-tabs">
             <button type="button" class="phase-tab" id="tab_pre_deal" onclick="setPhase('pre_deal')">
                 <span class="phase-tab-title" id="tab1_t">🕒 Stage 1: T-15m Pre-Deal</span>
-                <span class="phase-tab-desc" id="tab1_d">SMS Wake-Up Alert & Trap Wargaming (70% of Win)</span>
+                <span class="phase-tab-desc" id="tab1_d">Strategy preparation & reminder draft</span>
             </button>
             <button type="button" class="phase-tab active" id="tab_in_deal" onclick="setPhase('in_deal')">
                 <span class="phase-tab-title" id="tab2_t">⚡ Stage 2: Live In-Deal</span>
-                <span class="phase-tab-desc" id="tab2_d">Hardware Noise-Suppressed STT / Tactical Triage</span>
+                <span class="phase-tab-desc" id="tab2_d">Optional speech transcription & tactical review</span>
             </button>
             <button type="button" class="phase-tab" id="tab_post_deal" onclick="setPhase('post_deal')">
                 <span class="phase-tab-title" id="tab3_t">🎙️ Stage 3: T+0m Debrief</span>
@@ -945,17 +967,17 @@ HTML_UI = r"""<!DOCTYPE html>
 
         <div class="preset-row" id="preset_container"></div>
 
-        <label id="lbl_mode">Local Speech Recognition & Microphone Channel:</label>
+        <label id="lbl_mode">Optional speech transcription (browser-dependent):</label>
         <select id="voice_lang">
-            <option value="en-US" id="opt_lang_en">🎙️ Microphone Channel: English (US / Global) + Hardware Noise Suppression</option>
-            <option value="zh-CN" id="opt_lang_zh">🎙️ 麦克风通道：中文 (普通话) + 硬件级声学降噪 DSP</option>
+            <option value="en-US" id="opt_lang_en">🎙️ English transcription (browser-dependent)</option>
+            <option value="zh-CN" id="opt_lang_zh">🎙️ 中文转写（依赖浏览器支持）</option>
         </select>
 
         <label id="lbl_input_text">Stage Input (Meeting Context / Live Opponent Speech / 60s Post-Deal Voice Memo):</label>
         <textarea id="input_text" rows="3"></textarea>
 
         <div class="btn-row">
-            <button type="button" id="mic_btn" class="mic-btn" onclick="toggleMic()">🎤 开启降噪语音捕获 (对手发言时点击)</button>
+            <button type="button" id="mic_btn" class="mic-btn" onclick="toggleMic()">🎤 启动语音转写（须征得同意）</button>
             <button type="button" id="run_btn" class="primary" onclick="runAgent()">⚡ Execute Game-Theoretic Engine</button>
         </div>
     </div>
@@ -998,9 +1020,9 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <!-- 4. 博弈论内核、隐私边界与工程迭代证据 -->
     <div class="card">
-        <strong class="card-title" id="sec3_title">🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log</strong>
+        <strong class="card-title" id="sec3_title">🔍 3. Architecture, privacy boundaries & tests</strong>
         <p style="font-size:13.5px; color:#64748b; margin:8px 0 14px 0;" id="privacy_desc"></p>
-        <div id="iteration_table_container"></div>
+        <p class="dg-footnote" id="research_note">The deterministic audit and regression tests are in the public repository. Accuracy, latency and retention claims require independent verification.</p><a href="https://github.com/Serein131/Consigliere-ai" target="_blank" rel="noopener noreferrer">Read tests & source</a>
     </div>
 
     <script>
@@ -1021,13 +1043,13 @@ HTML_UI = r"""<!DOCTYPE html>
         const PROFILES = {
             en: {
                 goal: "Close annual compute supply agreement under $1.2M total budget; legal sign-off by Friday.",
-                bottom: "Payment terms >= 45 days; max discount <= 10%; zero exclusive lock-in clauses.",
-                risk: "Relationship-focused; prone to anxiety and premature concessions when hit with artificial deadlines (Ultimatum Game) or future volume bait (Cheap Talk)."
+                bottom: "Seller: payment within 45 days; max discount 10%; no exclusivity.",
+                risk: "Require written confirmation, time to review, and no unapproved concessions."
             },
             zh: {
                 goal: "拿下年度算力供应合同，目标总价控制在 120 万以内，本周五前完成法务初审。",
-                bottom: "账期绝不低于 45 天；降价幅度不超过 10%；绝不接受独家排他性条款。",
-                risk: "重视长期合作关系；当对方抛出‘限时最后通牒（Ultimatum）’或‘明年大单画饼（Cheap Talk）’时容易焦虑让步。"
+                bottom: "卖方：期望45天内收款；折扣不超过10%；禁止独家合作。",
+                risk: "优先书面确认，预留审阅时间；未经同意不作承诺。"
             }
         };
 
@@ -1064,12 +1086,12 @@ HTML_UI = r"""<!DOCTYPE html>
 
         const PILLAR_TITLES = {
             en: {
-                pre_deal: ["🎯 Opening Anchor & Frame", "🛡️ Predicted Traps & Cheap Talk", "🚨 Panic Circuit Breaker"],
+                pre_deal: ["🎯 Opening Anchor & Frame", "🛡️ Predicted Traps & Cheap Talk", "🚨 Decision reminder"],
                 in_deal: ["📌 Verified Facts", "♟️ Strategic Inferences (Game Theory)", "❓ Unknowns to Probe"],
                 post_deal: ["✅ Defended Ground", "⚠️ Verbal Slippage & Exposure", "🔒 Quid Pro Quo Conditioning"]
             },
             zh: {
-                pre_deal: ["🎯 先发制人开场锚点", "🛡️ 预判陷阱与廉价信号识别", "🚨 性格弱点防冲动熔断动作"],
+                pre_deal: ["🎯 先发制人开场锚点", "🛡️ 预判陷阱与廉价信号识别", "🚨 决策提醒与待核查事项"],
                 in_deal: ["📌 客观事实 (Verified Facts)", "♟️ 博弈推断 (Strategic Inferences)", "❓ 未知盲区 (Unknowns to Probe)"],
                 post_deal: ["✅ 成功守住的筹码阵地", "⚠️ 口头妥协漏洞与风险敞口", "🔒 对等交换条件锁定 (Quid Pro Quo)"]
             }
@@ -1084,15 +1106,25 @@ HTML_UI = r"""<!DOCTYPE html>
                 hero: 'A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.',
                 chip1:'✓ Explicit rule checks', chip2:'✓ Evidence, not guesswork', chip3:'✓ Unknown ≠ Safe',
                 panel:'01 / Independent deal audit', label:'NO GEMINI CALL REQUIRED',
-                desc:'Uses your Hard Bottom Lines and the proposal text below. Detects explicit discount, payment-window, and exclusivity rule conflicts. The rules are inspectable and conservative.',
+                desc:'Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.',
                 check:'◆ Check deal constraints', demo:'Load 3-rule stress test', pending:'Checking…',
                 notyet:'NOT YET CHECKED', violation:'RULE VIOLATION', unknown:'NEEDS VERIFICATION',
                 pass:'NO DETECTED VIOLATION', checks:'checks', failures:'violations',
                 foot:'Checks only supported, explicitly stated rules. No detected violation does not mean the deal is commercially or legally safe.',
-                error:'Audit failed: ', missing:'Enter proposed terms and hard bottom lines first.',
+                error:'Audit failed: ', missing:'Enter a proposal to audit.',
                 rules:{maximum_discount_pct:'Maximum discount',payment_days:'Payment days',no_exclusivity:'Exclusivity prohibited'},
                 states:{VIOLATION:'VIOLATION',PASS:'PASS',UNKNOWN:'UNKNOWN'},
-                observed:'Observed', limit:'Limit', min:'Minimum', max:'Maximum'
+                observed:'Observed', limit:'Threshold', min:'Minimum', max:'Maximum',
+                roleLabel:'Deal perspective',discountLabel:'Maximum discount (%)',payLabel:'Payment rule',
+                daysLabel:'Payment threshold (days)',exclusiveLabel:'Prohibit exclusivity',
+                configNote:'Only these structured settings determine the audited rules. Free-text notes are context for the AI, not additional checks.',
+                riskTitle:'Commercial risk review · separate from rule compliance',
+                seller:'Seller · receiving payment',buyer:'Buyer · making payment',unspecified:'Unspecified',
+                maximum:'At most (days)',minimum:'At least (days)',noRule:'No payment rule',
+                riskTitle:'Commercial risk review · separate from rule compliance',
+                reviewText:'Review independently',warningPrefix:'Rules needing clarification: ',
+                risks:{long_receivables:'Long receivables / cashflow',short_payables:'Short payables / cashflow',
+                    unlimited_liability:'Unlimited liability',auto_renewal:'Auto-renewal',termination_penalty:'Termination penalty'}
             },
             zh: {
                 kicker:'FOUNDER DEALGUARD · 创始人交易决策系统',
@@ -1100,34 +1132,72 @@ HTML_UI = r"""<!DOCTYPE html>
                 hero:'面向初创公司创始人的可审计交易承诺防火墙。先用独立规则引擎检查交易条件，再让 Consigliere AI 提供谈判策略。',
                 chip1:'✓ 明确规则校验',chip2:'✓ 可核查证据',chip3:'✓ 未知不等于安全',
                 panel:'01 / 独立交易底线审计',label:'不调用 GEMINI · 无需模型配额',
-                desc:'读取下方的「绝对底线」与「当前阶段输入」，检查明确的折扣、付款期限和独家条款冲突。未知情况不会伪装成安全。',
+                desc:'使用下方结构化规则与交易文本进行检查；自由文本仅作背景。不能识别的条件会提示人工核查。',
                 check:'◆ 立即检查交易底线',demo:'加载 3 项违规演示',pending:'审计中…',
                 notyet:'尚未检查',violation:'发现底线违规',unknown:'需要进一步核实',
                 pass:'未发现规则冲突',checks:'项检查',failures:'项违规',
                 foot:'只检查已支持且能够识别的明确规则。未发现违规不代表交易在法律或商业上安全。',
-                error:'审计失败：',missing:'请先填写交易底线和对方提出的条件。',
+                error:'审计失败：',missing:'请先填写对方提出的交易条件。',
                 rules:{maximum_discount_pct:'最大折扣',payment_days:'付款期限',no_exclusivity:'禁止独家'},
                 states:{VIOLATION:'违规',PASS:'符合',UNKNOWN:'未知'},
-                observed:'观察值',limit:'上限',min:'下限',max:'上限'
+                observed:'观察值',limit:'阈值',min:'下限',max:'上限',
+                roleLabel:'交易视角',discountLabel:'最大允许折扣 (%)',payLabel:'付款期限规则',
+                daysLabel:'付款期限阈值（天）',exclusiveLabel:'禁止独家合作',
+                configNote:'独立规则审计仅使用上方结构化设置。下方自由文本仅作 AI 分析背景，不会作为额外硬规则。',
+                riskTitle:'商业风险审查 · 与规则合规分开',
+                seller:'卖方 · 等待收款',buyer:'买方 · 对外付款',unspecified:'不指定',
+                maximum:'最多（天）',minimum:'至少（天）',noRule:'不检查付款期限',
+                reviewText:'需要单独评估',warningPrefix:'待澄清的规则：',
+                risks:{long_receivables:'回款周期长 / 现金流',short_payables:'付款周期短 / 现金流',
+                    unlimited_liability:'无限责任',auto_renewal:'自动续约',termination_penalty:'提前解约罚金'}
             }
         };
+        function getStructuredRules() {
+            const discount=document.getElementById('dg_discount').value;
+            const payDir=document.getElementById('dg_pay_dir').value;
+            const payDays=document.getElementById('dg_pay_days').value;
+            return {
+                role: document.getElementById('dg_role').value,
+                discount_max_pct: discount===''?null:Number(discount),
+                payment_direction:payDir==='none'?null:payDir,
+                payment_days:payDir==='none'||payDays===''?null:Number(payDays),
+                prohibit_exclusivity:document.getElementById('dg_no_exclusive').checked
+            };
+        }
         function updateDealGuardLabels() {
             const l = DG_LABELS[currentLang];
             const ids = {
                 dg_kicker:l.kicker,dg_headline:l.headline,dg_hero_desc:l.hero,
                 dg_chip1:l.chip1,dg_chip2:l.chip2,dg_chip3:l.chip3,
                 dg_panel_title:l.panel,dg_no_llm:l.label,dg_panel_desc:l.desc,
-                dg_check_btn:l.check,dg_demo_btn:l.demo,dg_footnote:l.foot
+                dg_check_btn:l.check,dg_demo_btn:l.demo,dg_footnote:l.foot,
+                dg_role_label:l.roleLabel,dg_discount_label:l.discountLabel,
+                dg_pay_label:l.payLabel,dg_days_label:l.daysLabel,
+                dg_exclusive_label:l.exclusiveLabel,dg_config_note:l.configNote,
+                dg_risk_title:l.riskTitle
             };
             Object.keys(ids).forEach(id => { document.getElementById(id).textContent = ids[id]; });
+            const perspective=document.getElementById('dg_role');
+            perspective.options[0].text=l.seller;
+            perspective.options[1].text=l.buyer;
+            perspective.options[2].text=l.unspecified;
+            const direction=document.getElementById('dg_pay_dir');
+            direction.options[0].text=l.maximum;
+            direction.options[1].text=l.minimum;
+            direction.options[2].text=l.noRule;
             document.getElementById('dg_output').style.display='none';
         }
         function loadDealGuardDemo() {
             const zh = currentLang === 'zh';
             setPhase('in_deal');
             document.getElementById('hard_bottom_line').value = zh
-                ? '最大折扣10%；付款期限至少45天；禁止独家合作'
-                : 'max discount <=10%; payment terms >=45 days; zero exclusivity';
+                ? '目标：避免超额折扣、过长收款账期和独家合作。'
+                : 'Goal: avoid excessive discounts, long receivable terms and exclusivity.';
+            document.getElementById('dg_role').value='seller';
+            document.getElementById('dg_discount').value='10';
+            document.getElementById('dg_pay_dir').value='maximum';
+            document.getElementById('dg_pay_days').value='45';
+            document.getElementById('dg_no_exclusive').checked=true;
             document.getElementById('input_text').value = zh
                 ? '客户要求15%折扣、付款期限30天、独家合作，并希望今天签署。'
                 : 'The customer requires a 15% discount, payment terms 30 days, and an exclusivity agreement signed today.';
@@ -1160,14 +1230,15 @@ HTML_UI = r"""<!DOCTYPE html>
             output.style.display='block';findings.replaceChildren();counter.textContent='';
             const text=document.getElementById('input_text').value;
             const rules=document.getElementById('hard_bottom_line').value;
-            if(!text.trim() || !rules.trim()){
+            if(!text.trim()){
                 status.className='dg-status unknown';status.textContent=l.missing;return;
             }
             btn.disabled=true;status.className='dg-status unknown';status.textContent=l.pending;
             try{
                 // Identifiers are masked with the same client-side helper as the three-stage app.
                 const body={text:clientSideRedact(text).sanitizedText,
-                    hard_bottom_line:clientSideRedact(rules).sanitizedText};
+                    hard_bottom_line:clientSideRedact(rules).sanitizedText,
+                    structured_rules:getStructuredRules()};
                 const res=await fetch('/audit',{method:'POST',
                     headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
                 const result=await res.json();
@@ -1180,6 +1251,21 @@ HTML_UI = r"""<!DOCTYPE html>
                 counter.textContent=(result.configured_checks || 0)+' '+l.checks+' · '+
                     (result.violation_count || 0)+' '+l.failures;
                 (result.findings || []).forEach(f=>addAuditFinding(findings,f,l));
+                const commercial=document.getElementById('dg_risk'),
+                    commercialFindings=document.getElementById('dg_risk_findings');
+                commercialFindings.replaceChildren();
+                const risks=result.commercial_risks || [];
+                commercial.style.display=risks.length?'block':'none';
+                risks.forEach(r=>{
+                    const paragraph=document.createElement('p');
+                    paragraph.textContent=(l.risks[r.code] || r.code)+
+                        (r.evidence?' · '+r.evidence:'')+' — '+
+                        (l.reviewText || 'Review separately');
+                    commercialFindings.appendChild(paragraph);
+                });
+                const warnings=(result.rule_warnings || []);
+                document.getElementById('dg_rule_warnings').textContent=
+                    warnings.length?l.warningPrefix+warnings.join('; '):'';
             }catch(err){
                 status.className='dg-status violation';
                 status.textContent=l.error+err.message;
@@ -1231,69 +1317,6 @@ HTML_UI = r"""<!DOCTYPE html>
             alert(currentLang === 'zh' ? '会话链路记忆已清空重置。' : 'Session memory chain has been reset.');
         }
 
-        function renderIterationTable() {
-            const container = document.getElementById('iteration_table_container');
-            if (currentLang === 'zh') {
-                container.innerHTML = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>迭代版本</th>
-                                <th>发现的失效表现 / 测试者真实反馈</th>
-                                <th>博弈论与工程级重构举措</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>v1.0 → v2.0</strong></td>
-                                <td>误报率 100%：将常规友善的确认邮件也全量判定为高风险陷阱。</td>
-                                <td>引入 <code>SAFE</code> 基线与纳什合作检验机制，验证良性输入零误报。</td>
-                            </tr>
-                            <tr>
-                                <td><strong>v2.0 → v3.2</strong></td>
-                                <td>单句反问过于单薄，客观事实与推测混杂；正则误伤打码了“60秒”。</td>
-                                <td>强制执行认识论三元拆解（事实/推断/未知），修复正则保护时间词，加入中英自适应。</td>
-                            </tr>
-                            <tr>
-                                <td><strong>v3.2 → v4.6</strong></td>
-                                <td>长篇发言转写时前半句被索引覆盖丢弃；暗号盲打在触摸屏上极不实用。</td>
-                                <td><strong>彻底修复 Web Speech API 全量结果分块拼接 Bug（由 0 索引全量累加）</strong>；移除鸡肋暗号模式，聚焦硬件降噪流式语音捕获（支持2~3分钟长发言与4.5秒自然停顿检测）；后端升级为极速 <code>gemini-3.5-flash-lite</code>。</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-            } else {
-                container.innerHTML = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Iteration</th>
-                                <th>Failure Mode / Tester Feedback</th>
-                                <th>Engineering & Game-Theoretic Fix</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>v1.0 → v2.0</strong></td>
-                                <td>100% false-positive rate: flagged even benign agreement emails as hostile traps.</td>
-                                <td>Added <code>SAFE</code> baseline & Nash alignment check; verified zero false alarms on benign inputs.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>v2.0 → v3.2</strong></td>
-                                <td>Single-sentence output mixed up stated facts with AI speculation; regex accidentally redacted "60s".</td>
-                                <td>Enforced Epistemic Game Theory split (Facts / Inferences / Unknowns), refined regex to protect time units, and added EN/ZH auto-adaptation.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>v3.2 → v4.6</strong></td>
-                                <td>Prior speech chunks overwritten by resultIndex reset; shorthand created physical friction on touchscreens.</td>
-                                <td><strong>Completely fixed Web Speech API chunk aggregation bug (accumulating from index 0 across all chunks)</strong>; removed shorthand mode in favor of noise-suppressed continuous STT and migrated to <code>gemini-3.5-flash-lite</code>.</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                `;
-            }
-        }
-
         function setLanguage(lang) {
             currentLang = lang;
             updateDealGuardLabels();
@@ -1306,66 +1329,60 @@ HTML_UI = r"""<!DOCTYPE html>
             document.getElementById('voice_lang').value = lang === 'en' ? 'en-US' : 'zh-CN';
 
             if (lang === 'zh') {
-                document.getElementById('subtitle_text').innerText = "从根源化解录音难题：战前15分钟沙盘预警 (70%) • 硬件降噪战中干预 (20%) • 战后60秒口述复盘与跟进邮件 (10%)";
-                document.getElementById('sec1_title').innerText = "📂 1. 首席幕僚记忆库（保留点底线 BATNA、日程背景与性格弱点档案）";
+                document.getElementById('subtitle_text').innerText = "明确底线 · 审计交易条款 · 选择谈判方案";
+                document.getElementById('sec1_title').innerText = "📂 1. 商业目标与决策偏好";
                 document.getElementById('lbl_goal').innerText = "🎯 核心目标、预算与时间线：";
-                document.getElementById('lbl_bottom_line').innerText = "🛑 绝对底线 (纳什谈判威胁点 / BATNA)：";
-                document.getElementById('lbl_risk').innerText = "🧠 历史妥协习惯与性格盲区档案：";
-                document.getElementById('sec2_title').innerText = "🛡️ 2. 全周期三阶段博弈防线（无需现场非法全程录音）";
+                document.getElementById('lbl_bottom_line').innerText = "📝 其他交易备注（不自动作为硬规则）：";
+                document.getElementById('lbl_risk').innerText = "🧠 自行填写的决策偏好与提醒：";
+                document.getElementById('sec2_title').innerText = "🛡️ 2. 三阶段交易决策辅助";
                 document.getElementById('tab1_t').innerText = "🕒 阶段1：战前15分钟预警";
-                document.getElementById('tab1_d').innerText = "短信唤醒、对手套路沙盘与防冲动锚定";
+                document.getElementById('tab1_d').innerText = "会议策略准备与提醒文本";
                 document.getElementById('tab2_t').innerText = "⚡ 阶段2：战中无痕交锋";
-                document.getElementById('tab2_d').innerText = "硬件降噪长语音捕获 / 事实·推断·未知拆解";
+                document.getElementById('tab2_d').innerText = "可选语音转写 / 事实·推断·未知拆解";
                 document.getElementById('tab3_t').innerText = "🎙️ 阶段3：战后60秒复盘";
                 document.getElementById('tab3_d').innerText = "口述得失审计、口头让步找补与跟进邮件";
-                document.getElementById('lbl_mode').innerText = "本地语音转写与麦克风降噪通道：";
-                document.getElementById('opt_lang_en').innerText = "🎙️ 麦克风通道：English (US / Global) + Hardware Noise Suppression";
-                document.getElementById('opt_lang_zh').innerText = "🎙️ 麦克风通道：中文 (普通话) + 硬件级声学降噪 DSP";
+                document.getElementById('lbl_mode').innerText = "浏览器语音转写（依赖设备及浏览器）：";
+                document.getElementById('opt_lang_en').innerText = "🎙️ 麦克风通道：English (US / Global) + Browser-dependent transcription";
+                document.getElementById('opt_lang_zh').innerText = "🎙️ 中文语音转写（依赖浏览器）";
                 document.getElementById('lbl_input_text').innerText = "当前阶段输入（战前对手背景 / 战中对手发言转写或纪要 / 战后60秒语音口述）：";
-                document.getElementById('mic_btn').innerText = "🎤 开启降噪语音捕获 (对手发言时点击)";
+                document.getElementById('mic_btn').innerText = "🎤 启动语音转写（须征得同意）";
                 document.getElementById('run_btn').innerText = "⚡ 启动全周期博弈推演";
-                document.getElementById('btn_copy_q').innerText = "📋 复制破局反问/短信";
+                document.getElementById('btn_copy_q').innerText = "📋 复制反问/提醒草稿";
                 document.getElementById('btn_copy_draft').innerText = "📋 复制全文/跟进邮件";
                 document.getElementById('btn_mail_client').innerText = "✉️ 唤起本地邮件客户端";
 
-                document.getElementById('sec3_title').innerText = "🔍 3. 博弈论架构、隐私验证与工程迭代记录";
-                document.getElementById('privacy_desc').innerHTML = `
-                    • <strong>为何全周期胜过现场录音：</strong>在董事会或商务谈判现场秘密录音不仅违反双向知情同意法，且严重破坏互信。Consigliere AI 通过<strong>阶段 1（战前 15 分钟沙盘）</strong>、<strong>阶段 2（降噪长语音捕获）</strong>与<strong>阶段 3（战后 60 秒口述复盘）</strong>串联，实现 100% 战术防御覆盖且零录音风险。<br>
-                    • <strong>长语音捕获与贝叶斯容错：</strong>前端激活 Web Audio 硬件降噪 DSP 并支持持续多分钟发言，结合后端基于记忆库档案的语义纠偏，有效防御杂音与同音转写误差。
-                `;
+                document.getElementById('sec3_title').innerText = "🔍 3. 技术架构、隐私限制与测试";
+                document.getElementById('privacy_desc').textContent = '使用结构化规则与 AI 建议辅助交易决策。正则脱敏不能确保完全删除敏感信息；语音识别可能依赖浏览器或服务商。须获得必要录音同意，仅使用合成案例演示。';
             } else {
-                document.getElementById('subtitle_text').innerText = "Solving Recording Dilemma: T-15m Wargame • Noise-Suppressed In-Deal • T+0m Debrief";
-                document.getElementById('sec1_title').innerText = "📂 1. Chief of Staff Memory Bank (Reservation Values, Calendar Context & Vulnerabilities)";
+                document.getElementById('subtitle_text').innerText = "Set limits · Verify terms · Explore options";
+                document.getElementById('sec1_title').innerText = "📂 1. Commercial goals and decision preferences";
                 document.getElementById('lbl_goal').innerText = "🎯 Core Goal, Budget & Timeline:";
-                document.getElementById('lbl_bottom_line').innerText = "🛑 Hard Bottom Lines (Nash Threat Points / BATNA):";
-                document.getElementById('lbl_risk').innerText = "🧠 Historical Commitments & Behavioral Vulnerability Profile:";
-                document.getElementById('sec2_title').innerText = "🛡️ 2. Full-Cycle Negotiation Defense (No Continuous Audio Surveillance Required)";
+                document.getElementById('lbl_bottom_line').innerText = "📝 Other deal notes (not machine-enforced):";
+                document.getElementById('lbl_risk').innerText = "🧠 User-entered decision preferences and reminders:";
+                document.getElementById('sec2_title').innerText = "🛡️ 2. Three-stage decision support";
                 document.getElementById('tab1_t').innerText = "🕒 Stage 1: T-15m Pre-Deal";
-                document.getElementById('tab1_d').innerText = "SMS Wake-Up Alert & Trap Wargaming (70% of Win)";
+                document.getElementById('tab1_d').innerText = "Strategy preparation and reminder draft";
                 document.getElementById('tab2_t').innerText = "⚡ Stage 2: Live In-Deal";
-                document.getElementById('tab2_d').innerText = "Hardware Noise-Suppressed STT / Tactical Triage";
+                document.getElementById('tab2_d').innerText = "Optional speech transcript and tactical review";
                 document.getElementById('tab3_t').innerText = "🎙️ Stage 3: T+0m Debrief";
                 document.getElementById('tab3_d').innerText = "60s Voice Audit vs. Bottom Lines & Follow-Up Email";
-                document.getElementById('lbl_mode').innerText = "Local Speech Recognition & Microphone Channel:";
-                document.getElementById('opt_lang_en').innerText = "🎙️ Microphone Channel: English (US / Global) + Hardware Noise Suppression";
-                document.getElementById('opt_lang_zh').innerText = "🎙️ 麦克风通道：中文 (普通话) + 硬件级声学降噪 DSP";
+                document.getElementById('lbl_mode').innerText = "Optional speech transcription (browser-dependent):";
+                document.getElementById('opt_lang_en').innerText = "🎙️ English transcription (browser-dependent)";
+                document.getElementById('opt_lang_zh').innerText = "🎙️ 中文语音转写（依赖浏览器）";
                 document.getElementById('lbl_input_text').innerText = "Stage Input (Meeting Context / Live Opponent Speech / 60s Post-Deal Voice Memo):";
-                document.getElementById('mic_btn').innerText = "🎤 Start Noise-Suppressed Capture";
+                document.getElementById('mic_btn').innerText = "🎤 Start speech transcription (consent required)";
                 document.getElementById('run_btn').innerText = "⚡ Execute Game-Theoretic Engine";
                 document.getElementById('btn_copy_q').innerText = "📋 Copy Alert";
                 document.getElementById('btn_copy_draft').innerText = "📋 Copy Full Draft / Email";
                 document.getElementById('btn_mail_client').innerText = "✉️ Open in Mail Client";
 
-                document.getElementById('sec3_title').innerText = "🔍 3. Game-Theoretic Architecture, Privacy Verification & Iteration Log";
-                document.getElementById('privacy_desc').innerHTML = `
-                    • <strong>Why Full-Cycle Beats Eavesdropping:</strong> Recording boardroom audio violates consent laws and creates hostility. By chaining <strong>Stage 1 (T-15m Wargame)</strong>, <strong>Stage 2 (Continuous STT)</strong>, and <strong>Stage 3 (60s Post-Deal Voice Debrief)</strong> in local memory, Consigliere AI delivers end-to-end tactical defense with zero continuous audio recording.<br>
-                    • <strong>Hardware Noise Suppression & Bayesian Repair:</strong> Front-end requests system CoreAudio noise suppression DSP and supports multi-minute continuous speech, combined with prompt-level fuzzy correction using pre-deal memory.
-                `;
+                document.getElementById('sec3_title').innerText = "🔍 3. Architecture, privacy limitations and tests";
+                document.getElementById('privacy_desc').textContent = 'Decision support only. Regex redaction is incomplete; speech recognition may depend on browser/provider services. Obtain applicable recording consent and use synthetic data for demos.';
             }
 
             updatePillarHeaders();
             updateSessionUI();
-            renderIterationTable();
+            // Previous unsourced version metrics removed.
             renderPresets();
             const firstKey = Object.keys(STAGE_PRESETS[currentLang][currentPhase])[0];
             loadPreset(firstKey);
@@ -1382,9 +1399,9 @@ HTML_UI = r"""<!DOCTYPE html>
             } else if (currentPhase === 'in_deal') {
                 container.innerHTML = currentLang === 'zh'
                     ? `<button type="button" class="preset-btn" onclick="loadPreset('trap')">🔥 战中案例 1：高危复合陷阱（压价25%+排他+假死线）</button>
-                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ 战中案例 2：良性对齐沟通（验证零误报）</button>`
+                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ 战中案例 2：良性对齐沟通（正常交易基线）</button>`
                     : `<button type="button" class="preset-btn" onclick="loadPreset('trap')">🔥 Live Case 1: Ultimatum Trap (25% Cut + Exclusivity)</button>
-                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ Live Case 2: Benign Alignment (Zero False Alarm)</button>`;
+                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ Live Case 2: Benign Alignment (Benign Baseline)</button>`;
             } else {
                 container.innerHTML = currentLang === 'zh'
                     ? `<button type="button" class="preset-btn" onclick="loadPreset('slippage')">🚨 战后案例 1：现场口头松口越界（急需邮件附加条件找补）</button>
@@ -1505,7 +1522,7 @@ HTML_UI = r"""<!DOCTYPE html>
             isListening = false;
             const micBtn = document.getElementById('mic_btn');
             micBtn.className = 'mic-btn';
-            micBtn.innerText = currentLang === 'zh' ? "🎤 开启降噪语音捕获 (对手发言时点击)" : "🎤 Start Noise-Suppressed Capture";
+            micBtn.innerText = currentLang === 'zh' ? "🎤 启动语音转写（须征得同意）" : "🎤 Start speech transcription (consent required)";
         }
 
         async function runAgent() {
@@ -1522,7 +1539,7 @@ HTML_UI = r"""<!DOCTYPE html>
             errBox.style.display = 'none';
             isAgentRunning = true;
             runBtn.disabled = true;
-            runBtn.innerText = currentLang === 'zh' ? '⏳ 正在执行全周期博弈推演 (1~2秒)...' : '⏳ Running Game-Theoretic Deduction (1-2s)...';
+            runBtn.innerText = currentLang === 'zh' ? '⏳ 正在执行全周期博弈推演...' : '⏳ Running Game-Theoretic Deduction...';
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 18000);
@@ -1534,6 +1551,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 const localRedactedCount = scrubResult.redactedCount;
 
                 const payload = {
+                    structured_rules:getStructuredRules(),
                     phase: currentPhase,
                     lang: currentLang,
                     text: clientScrubbedText,
@@ -1582,16 +1600,19 @@ HTML_UI = r"""<!DOCTYPE html>
                 updatePillarHeaders();
 
                 const auditMsg = currentLang === 'zh'
-                    ? `🛡️ <strong>客户端正则脱敏已运行（不能保证覆盖全部敏感信息）：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（原始敏感词未出设备） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际离开浏览器并发往模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
-                    : `🛡️ <strong>Regex-based redaction applied (not a complete privacy guarantee):</strong> <b>${localRedactedCount}</b> sensitive entities scrubbed in browser memory prior to network call | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Actual Sanitized Payload Sent:</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
+                    ? `🛡️ <strong>客户端正则脱敏已运行（不能保证覆盖全部敏感信息）：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（无法确保所有敏感信息已删除） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>发送到分析接口的谈判文本（不含全部上下文）：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
+                    : `🛡️ <strong>Regex-based redaction applied (not a complete privacy guarantee):</strong> <b>${localRedactedCount}</b> possible identifiers replaced by client regex before network request | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Negotiation text excerpt (not full request):</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
 
                 const audit = data.dealguard_audit || {};
                 const findings = (audit.findings || []).map(f => f.rule + ': ' + f.status +
                     (f.observed === undefined ? '' : ' (observed: ' + f.observed + ')'));
                 const auditElement = document.createElement('pre');
                 auditElement.style.cssText = 'white-space:pre-wrap;padding:12px;border:1px solid #64748b;border-radius:8px;margin-top:8px';
-                auditElement.textContent = 'DealGuard deterministic audit: ' + (audit.assessment || 'UNKNOWN') +
-                    '\n' + findings.join('\n');
+                auditElement.textContent = 'DealGuard rule audit: ' + (audit.assessment || 'UNKNOWN') +
+                    '\n' + findings.join('\n') +
+                    '\nCommercial review: '+(audit.commercial_risk_level || 'NOT_ASSESSED')+
+                    (audit.commercial_risks || []).map(r=>'\n• '+r.code+': '+(r.evidence||'')).join('')+
+                    (audit.rule_warnings || []).map(w=>'\n⚠ '+w).join('');
                 const auditView = document.getElementById('audit_view');
                 // Escape interpolated payload in HTML before rendering the status message.
                 const safeAuditMsg = auditMsg.replace(/<code>([\s\S]*?)<\/code>/g, (whole, content) =>
@@ -1620,7 +1641,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 let counterPrefix = '';
                 let draftPrefix = '';
                 if (currentPhase === 'pre_deal') {
-                    counterPrefix = currentLang === 'zh' ? '📱 战前15分钟短信唤醒摘要：' : '📱 T-15m SMS Wake-Up Alert: ';
+                    counterPrefix = currentLang === 'zh' ? '📱 会前提醒草稿：' : '📱 Pre-meeting reminder draft: ';
                     draftPrefix = currentLang === 'zh' ? '📋 会前议程设定与先发锚定话术：\n' : '📋 Pre-Meeting Agenda Framing Opener:\n';
                 } else if (currentPhase === 'in_deal') {
                     counterPrefix = currentLang === 'zh' ? '🎯 建议当场反问（破局话术）：' : '🎯 Immediate Live Counter-Question: ';
@@ -1654,7 +1675,7 @@ HTML_UI = r"""<!DOCTYPE html>
         function copyCounterQuestion() {
             if (!latestTacticalOutput || !latestTacticalOutput.counter_question) return;
             navigator.clipboard.writeText(latestTacticalOutput.counter_question).then(() => {
-                showToast(currentLang === 'zh' ? '✅ 破局反问/短信已复制！' : '✅ Alert copied!');
+                showToast(currentLang === 'zh' ? '✅ 反问或提醒草稿已复制！' : '✅ Alert copied!');
             });
         }
 

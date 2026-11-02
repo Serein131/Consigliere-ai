@@ -1,57 +1,38 @@
-# Consigliere AI · Founder DealGuard (research prototype)
+# Consigliere AI v5.1 — Founder DealGuard
 
-A three-stage negotiation copilot with a **model-independent commercial constraint audit**.
+Auditable startup deal decision support, not legal advice or autonomous deal execution.
 
-## Problem and falsifiable research question
+## What's new
 
-Can deterministic deal constraints + a structured AI analysis reduce explicit rule violations and unsupported safety assurances compared with a generic LLM negotiation prompt?
+- Structured bilingual controls: buyer/seller role, discount cap, minimum or maximum payment days, and exclusivity prohibition.
+- Deterministic /audit without an LLM. /analyze passes audit evidence to Gemini.
+- Distinguishes some proposed, rejected, historical and agreed statements; uncertain or unsupported terms return UNKNOWN.
+- Separate commercial-risk review for long receivables, short payment windows, auto-renewal, penalties and unlimited liability.
+- Free-text context is not a machine-enforced rule. Configure structured controls explicitly.
+- Removes unsourced statistics, SMS delivery claims, and unsupported recording/privacy promises.
 
-The aim is **decision support**, not autonomous negotiation, verified psychological assessment, contract enforceability, or legal advice.
+## Test
 
-## Architecture
+Run: python -m unittest discover -s tests -v
+Run: python -m py_compile app.py dealguard.py
+Run: python app.py
 
-- `/audit` — deterministic, model-free, auditable rules (no Gemini API call).
-- `/analyze` — same rule audit + Gemini strategic explanation; explicit detected violations cannot be marked SAFE.
-- Three workflow stages — pre-deal, live triage, post-deal, with reduced/sanitized prior-stage summaries.
-- English/Chinese rules currently supported for **maximum discount**, **minimum or maximum payment days**, and **no exclusivity**. Wording coverage is limited. Absent evidence returns UNKNOWN.
+POST /audit with text, hard_bottom_line, and structured_rules. Example structured_rules:
 
-### Test locally
+    {"role":"seller","discount_max_pct":10,"payment_direction":"maximum","payment_days":45,"prohibit_exclusivity":true}
 
-```bash
-python -m pip install -r requirements.txt
-python -m unittest discover -s tests -v
-python app.py
-```
+Try a proposal containing a 15% discount, 90-day payment and exclusivity: three violations should be flagged. Try a rejected 15% discount: it must not be treated as an actionable commitment.
 
-`/audit` example:
+## Evaluation status
 
-```bash
-curl -s http://localhost:5000/audit -H 'Content-Type: application/json' -d '{
-  "hard_bottom_line": "max discount <=10%; payment terms >=45 days; zero exclusivity",
-  "text": "15% discount; payment terms 30 days; exclusivity agreement"
-}'
-```
+The checked-in tests are narrow regression cases, not published detection-accuracy estimates. A stronger study should use independently labeled English and Chinese scenarios to compare baseline prompts with model plus structured constraints, including precision, recall, false alarm rate and unknown handling.
 
-Expected: three VIOLATION findings. Counterexample: `10% discount; payment terms 90 days; no exclusivity` is compliant with **these** user-defined rules, though 90 days may be commercially unfavorable for cash collection. Specify a maximum payment window if appropriate.
+## Limits and privacy
 
-## Evaluation methodology (planned; not measured)
+Regex parsing cannot resolve all legal negations, counteroffers, participant attribution or transcript errors. PASS only means the stated term passed a configured check; it does not mean the deal is sound. UNKNOWN must not be considered safe.
 
-1. Build >=50 **synthetic**, independently labeled English/Chinese negotiation scenarios, including benign proposals, adversarial pressure, uncertain wording, and contradictory rules.
-2. Compare baseline generic Gemini prompts vs. Gemini+DealGuard vs. deterministic `/audit` on the same cases.
-3. Record violation detection precision/recall, false positives, unknown calibration, rule-direction errors, and P50/P95 end-to-end latency.
-4. Have at least two independent reviewers label borderline cases; report disagreements.
-5. Separate **measured** outcomes from aspirations; do not claim reliable sub-2-second latency, zero retention, or business impact without evidence.
+Regex redaction is incomplete; app/server/provider data-retention rules are not independently verified. Speech recognition may involve third-party processing. Use only synthetic cases and obtain needed recording consent.
 
-## Security and privacy boundaries
+## Portfolio
 
-Current privacy protections are partial regex-based sanitization, **not verified zero retention, end-to-end confidentiality, or comprehensive DLP**. Commercial terms and residual identifiers may still reach server/cloud model. Use synthetic demo data. Do not paste real sensitive contracts or private negotiation content until a full privacy/security review. The web speech recognition feature may be browser/provider-dependent; do not represent it as on-device-only speech processing without verification.
-
-## Current limits
-
-- The parser does not reliably handle nuanced legal negation, overlapping contractual definitions, currency comparisons, compound rule priority, or multilingual transcription ambiguity.
-- An audit status of NO_DETECTED_VIOLATION only means that the explicitly configured and recognized checks passed.
-- A high-stakes contract requires qualified professional review.
-
-## Portfolio demo
-
-Present a short video showing three cases: obvious violation, benign compliant proposal, and ambiguous/unknown input. Explain the change from a generic negotiation copilot to a verifiable **commitment firewall**. Include test scripts, transparent failures, and subsequent iterations. Your project description should distinguish your personal contribution from AI-assisted coding.
+Show one clearly violating case, one rejected offer, one compliant case, and a separate commercial-risk flag. State AI-assisted implementation and your own decisions/test contributions accurately.
