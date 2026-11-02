@@ -6,11 +6,11 @@
 
 ## Latest four-arm experiment · measured 2026-11-02
 
-The new 24-case frozen synthetic comparison actually completed **A (Gemini direct) = 21/24**, **C (DealGuard deterministic) = 11/24**, and **D (Gemini extraction + evidence validation + deterministic checks) = 22/24**. **B (OpenAI GPT) was NOT_RUN** because no `OPENAI_API_KEY` was configured. The hybrid did one case better than Gemini on this small, AI-authored set; it also missed a genuine violation because the source citation was hallucinated and rejected. **This is not independent, real-world accuracy or robust evidence of superiority.**
+The 24-case frozen synthetic comparison completed **A (Gemini direct) = 21/24 on attempt 1 and 22/24 on repeat**, **C (DealGuard deterministic) = 11/24**, and **D (Gemini extraction + evidence validation + deterministic checks) = 22/24 in both attempts**. **B (OpenAI GPT) is still NOT_RUN**: its API key was subsequently configured, but the first real inference received `credit_balance_exhausted` (HTTP 429), confirmed by a safe diagnostic. **No GPT accuracy number exists.** The apparent hybrid advantage of one case on the first run vanished on repeat; synthetic, non-expert-validated data do not support a general performance claim.
 
 - [Latest authentic results, 4-case analysis and API limitations](FOUR_ARM_RESULTS.md)
 - [GitHub run #41422998049 with original predictions](https://github.com/Serein131/Consigliere-ai/actions/runs/41422998049)
-- [Separate GPT API authorization instructions](FOUR_ARM_SETUP.md)
+- [GPT billing status and GPT-only completion workflow](FOUR_ARM_SETUP.md)
 
 ## What has actually been measured
 
