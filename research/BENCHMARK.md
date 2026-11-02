@@ -4,6 +4,14 @@
 
 > **Current evidence is from synthetic, AI-assisted examples.** It is not independent contract accuracy, published academic research, or real customer validation.
 
+## Latest four-arm experiment · measured 2026-11-02
+
+The new 24-case frozen synthetic comparison actually completed **A (Gemini direct) = 21/24**, **C (DealGuard deterministic) = 11/24**, and **D (Gemini extraction + evidence validation + deterministic checks) = 22/24**. **B (OpenAI GPT) was NOT_RUN** because no `OPENAI_API_KEY` was configured. The hybrid did one case better than Gemini on this small, AI-authored set; it also missed a genuine violation because the source citation was hallucinated and rejected. **This is not independent, real-world accuracy or robust evidence of superiority.**
+
+- [Latest authentic results, 4-case analysis and API limitations](FOUR_ARM_RESULTS.md)
+- [GitHub run #41422998049 with original predictions](https://github.com/Serein131/Consigliere-ai/actions/runs/41422998049)
+- [Separate GPT API authorization instructions](FOUR_ARM_SETUP.md)
+
 ## What has actually been measured
 
 | Date / dataset | Gemini alone | DealGuard deterministic | Interpretation |
@@ -32,7 +40,7 @@ The Gemini and GPT baseline **share the same rule-auditing task prompt**. The hy
 
 **Frozen evaluation set:** [24 newly authored cases](cases/four_arm_frozen_24.json). Set declared before scoring; labels remain AI-assisted, not independently adjudicated.
 
-**Four-arm results:** See [FOUR_ARM_RESULTS.md](FOUR_ARM_RESULTS.md) **only if generated after API calls**. If no completed OpenAI API key is available, Group B must remain NOT_RUN; its results must not be invented or inferred from ChatGPT conversation output.
+**Four-arm results:** [now measured for A, C, D](FOUR_ARM_RESULTS.md). Group B is explicitly NOT_RUN pending independent OpenAI API authorization; no GPT scores are inferred from ChatGPT conversation output.
 
 ## What to measure
 
