@@ -1,5 +1,9 @@
 name: Gemini Baseline Comparison (manual API run)
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/gemini-baseline.yml'
   workflow_dispatch:
     inputs:
       sample_size:
@@ -36,7 +40,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.5-flash-lite
-          SAMPLE_SIZE: ${{ inputs.sample_size }}
+          SAMPLE_SIZE: ${{ inputs.sample_size || '10' }}
         run: |
           python research/run_gemini_baseline.py --limit "$SAMPLE_SIZE" --sleep 2
           python - <<'PY'
