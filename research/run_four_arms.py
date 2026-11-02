@@ -60,6 +60,25 @@ def _request(url, body, headers):
     with urllib.request.urlopen(req,timeout=55) as response:
         return json.load(response)
 
+def _model_json(text):
+    """Handle optional Markdown fences and JSON envelopes without inventing a prediction."""
+    text=str(text).strip()
+    fence=chr(96)*3
+    if text.startswith(fence) and "\n" in text:
+        text=text.split("\n",1)[1].rsplit(fence,1)[0].strip()
+    try:
+        result=json.loads(text)
+    except json.JSONDecodeError as error:
+        # All case inputs are synthetic. Log only response format, no credentials.
+        print("Model produced malformed JSON; chars:",len(text),
+              "start:",repr(text[:85]),"parse category:",type(error).__name__,flush=True)
+        raise
+    if isinstance(result,str):
+        result=json.loads(result)
+    if not isinstance(result,dict):
+        raise ValueError("Model output was not a JSON object")
+    return result
+
 def _gemini_direct(case, key, model):
     # Identical task instruction and user JSON as GPT, aside from provider transport.
     prompt=json.dumps({"structured_rules":case["structured_rules"],
@@ -72,7 +91,9 @@ def _gemini_direct(case, key, model):
     doc=_request("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",
         payload,{"Content-Type":"application/json","x-goog-api-key":key})
     text="".join(x.get("text","") for x in doc["candidates"][0]["content"]["parts"])
-    result=json.loads(text)
+    result=_model_json(text)
+    if "predicted_rule_status" not in result or "predicted_commercial_risks" not in result:
+        print("Gemini returned unexpected field names:",sorted(result)[:8],flush=True)
     states=result.get("predicted_rule_status",{})
     risks=result.get("predicted_commercial_risks",[])
     if not isinstance(states,dict) or not isinstance(risks,list):
@@ -90,7 +111,7 @@ def _gemini_extract(text, key, model):
     doc=_request("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",
         payload,{"Content-Type":"application/json","x-goog-api-key":key})
     chunks=doc["candidates"][0]["content"]["parts"]
-    return json.loads("".join(p.get("text","") for p in chunks))
+    return _model_json("".join(p.get("text","") for p in chunks))
 
 def _openai_direct(case, key, model):
     prompt=json.dumps({"structured_rules":case["structured_rules"],
@@ -112,7 +133,7 @@ def _openai_direct(case, key, model):
                 if part.get("type")=="output_text":
                     pieces.append(part.get("text",""))
     if not pieces:raise ValueError("OpenAI returned no text output")
-    result=json.loads("".join(pieces))
+    result=_model_json("".join(pieces))
     states=result.get("predicted_rule_status",{})
     risks=result.get("predicted_commercial_risks",[])
     if not isinstance(states,dict) or not isinstance(risks,list):
@@ -162,6 +183,10 @@ def run(cases,mode,output,model,keys,delay=6):
                 print(case["id"],mode,"HTTP",error.code,"request failed",flush=True)
                 break
             except (urllib.error.URLError,ValueError,KeyError,IndexError,TimeoutError,TypeError) as error:
+                if attempt<2 and mode!="rules":
+                    print(case["id"],mode,"response issue:",type(error).__name__,"retry",attempt+1,flush=True)
+                    time.sleep(8)
+                    continue
                 print(case["id"],mode,"error category:",type(error).__name__,flush=True)
                 break
         if result is None:
