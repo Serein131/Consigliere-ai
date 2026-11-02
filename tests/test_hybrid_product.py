@@ -115,6 +115,18 @@ class HybridEndpointTests(unittest.TestCase):
             self.assertEqual(response.json["error"], "MODEL_CONSENT_REQUIRED")
             model.assert_not_called()
 
+    def test_deployment_can_disable_hybrid_without_disabling_rules(self):
+        with patch.dict("os.environ", {"ENABLE_HYBRID_AUDIT": "false"}):
+            with patch("app.execute_hybrid") as model:
+                response = self.request()
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json["error"], "HYBRID_DISABLED")
+                model.assert_not_called()
+        rules_response = self.client.post("/audit", json={
+            "text": FIXTURE, "structured_rules": RULES
+        })
+        self.assertEqual(rules_response.status_code, 200)
+
     def test_invalid_payload(self):
         response = self.client.post("/hybrid-audit", data="not-json")
         self.assertEqual(response.status_code, 400)
