@@ -138,9 +138,14 @@ def main():
     parser.add_argument("--output",default=str(ROOT/"research"/"benchmark_report.md"))
     parser.add_argument("--json",default=str(ROOT/"research"/"benchmark_report.json"))
     parser.add_argument("--baseline-predictions",help="Optional JSON array of predictions from generic LLM")
+    parser.add_argument("--limit",type=int,default=0,help="Evaluate first N ordered cases; zero means all")
     args=parser.parse_args()
     source=json.loads(pathlib.Path(args.cases).read_text(encoding="utf-8"))
     cases=source["cases"]
+    if args.limit:
+        if args.limit<0 or args.limit>len(cases):
+            raise SystemExit("--limit outside available case count")
+        cases=cases[:args.limit]
     if len({c["id"] for c in cases})!=len(cases):
         raise SystemExit("Dataset contains duplicate case ids")
     predictions=None
