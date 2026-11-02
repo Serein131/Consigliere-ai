@@ -1923,12 +1923,17 @@ HTML_UI = r"""<!DOCTYPE html>
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            const sysLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
-            if (sysLang.startsWith('en')) {
-                setLanguage('en');
-            } else {
-                setLanguage('zh');
-            }
+            const sysLang=(navigator.language || navigator.userLanguage || '').toLowerCase();
+            setLanguage(sysLang.startsWith('en')?'en':'zh');
+            const editor=document.getElementById('dg_proposal');
+            editor.addEventListener('input',()=>{updateDealCharCount();invalidateDealAudit();});
+            ['dg_role','dg_discount','dg_pay_dir','dg_pay_days','dg_no_exclusive'].forEach(id=>{
+                const element=document.getElementById(id);
+                element.addEventListener('input',invalidateDealAudit);
+                element.addEventListener('change',invalidateDealAudit);
+            });
+            // A previous result must never look current after the input or rule limits change.
+            updateDealCharCount();
         });
     </script>
 </body>
