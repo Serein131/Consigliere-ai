@@ -5,6 +5,7 @@ import json
 import logging
 import http.client
 from flask import Flask, request, jsonify, render_template_string
+from dealguard import check_deal
 
 app = Flask(__name__)
 
@@ -24,7 +25,7 @@ def server_fallback_redact(text: str) -> dict:
     redacted = re.sub(r'\b([A-Z]{2,5}-\d{2,6}|\#[A-Za-z0-9]{4,10})\b', '[REDACTED_ID]', redacted)
     # 金额与百分比（保护“60秒、15分钟、45天、30天”等纯时间词不被误伤）
     redacted = re.sub(
-        r'([\$¥￥€£]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:万美金|万美元|万港币|万元|万|亿|million|billion|k|m|b))?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万美金|万美元|万港币|万元|万|亿|美金|美元|港币|元|块|million|billion|k|m|b|%))',
+        r'([\$¥￥€£]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:万美金|万美元|万港币|万元|万|亿|million|billion|k|m|b))?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万美金|万美元|万港币|万元|万|亿|美金|美元|港币|元|块|million|billion|k|m|b))',
         '[REDACTED_VALUE]',
         redacted,
         flags=re.IGNORECASE
@@ -98,10 +99,10 @@ def analyze_negotiation():
 
     phase = payload.get("phase", "in_deal")
     lang_pref = payload.get("lang", "en")
-    incoming_text = payload.get("text", "").strip()
-    user_goal = payload.get("user_goal", "").strip()
-    hard_bottom_line = payload.get("hard_bottom_line", "").strip()
-    risk_preference = payload.get("risk_preference", "").strip()
+    incoming_text = str(payload.get("text") or "")[:12000].strip()
+    user_goal = str(payload.get("user_goal") or "")[:2000].strip()
+    hard_bottom_line = str(payload.get("hard_bottom_line") or "")[:2000].strip()
+    risk_preference = str(payload.get("risk_preference") or "")[:2000].strip()
     session_context = payload.get("session_context") or {}
 
     if not incoming_text:
@@ -109,6 +110,12 @@ def analyze_negotiation():
 
     redaction_result = server_fallback_redact(incoming_text)
     sanitized_text = redaction_result["sanitized_text"]
+    dealguard_audit = check_deal(sanitized_text, hard_bottom_line)
+    user_goal = server_fallback_redact(user_goal)["sanitized_text"]
+    hard_bottom_line = server_fallback_redact(hard_bottom_line)["sanitized_text"]
+    risk_preference = server_fallback_redact(risk_preference)["sanitized_text"]
+    session_context = {}  # Do not transmit previously generated free-text drafts.
+
 
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
@@ -197,6 +204,8 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
 }}"""
 
     user_prompt = f"[{phase.upper()} INPUT (Sanitized)]: {sanitized_text}{session_history_str}"
+    user_prompt += "\n[DETERMINISTIC DEALGUARD AUDIT]: " + json.dumps(dealguard_audit, ensure_ascii=False)
+    user_prompt += "\nExplicit audit findings take precedence. UNKNOWN does not mean SAFE. Never invent terms or assert inferred motives as facts."
 
     primary_model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     candidate_models = [primary_model, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3-flash-preview"]
@@ -248,6 +257,16 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
             text_out = re.sub(r"^```(?:json)?\s*|\s*```$", "", text_out, flags=re.DOTALL).strip()
 
         tactical_output = json.loads(text_out)
+        if not isinstance(tactical_output, dict):
+            raise ValueError("Expected JSON object")
+        if tactical_output.get("risk_level") not in ("SAFE","LOW","MEDIUM","CRITICAL"):
+            tactical_output["risk_level"] = "MEDIUM"
+        if dealguard_audit["violation_count"] > 0:
+            tactical_output["risk_level"] = "CRITICAL"
+            prefix = "确定性规则审计检测到交易底线冲突。" if lang_pref == "zh" else "Deterministic rule audit detected explicit constraint violation."
+            tactical_output["triggered_rule"] = prefix + " " + str(tactical_output.get("triggered_rule",""))
+        elif dealguard_audit["assessment"] == "UNKNOWN" and tactical_output["risk_level"] == "SAFE":
+            tactical_output["risk_level"] = "LOW"
         latency_ms = round((time.perf_counter() - start_time) * 1000)
 
         return jsonify({
@@ -256,6 +275,7 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
             "measured_latency_ms": latency_ms,
             "model_used": used_model,
             "phase_executed": phase,
+            "dealguard_audit": dealguard_audit,
             "tactical_advice": tactical_output
         })
     except Exception as parse_err:
@@ -1169,7 +1189,7 @@ HTML_UI = r"""<!DOCTYPE html>
             redacted = redacted.replace(/[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/g, '[REDACTED_EMAIL]');
             redacted = redacted.replace(/(\+?\d{1,3}[-\s]?)?\(?\d{3}\)?[-\s]?\d{3,4}[-\s]?\d{4}/g, '[REDACTED_PHONE]');
             redacted = redacted.replace(/\b([A-Z]{2,5}-\d{2,6}|\#[A-Za-z0-9]{4,10})\b/g, '[REDACTED_ID]');
-            redacted = redacted.replace(/([\$¥￥€£]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:万美金|万美元|万港币|万元|万|亿|million|billion|k|m|b))?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万美金|万美元|万港币|万元|万|亿|美金|美元|港币|元|块|million|billion|k|m|b|%))/gi, '[REDACTED_VALUE]');
+            redacted = redacted.replace(/([\$¥￥€£]\s*\d+(?:,\d{3})*(?:\.\d+)?(?:\s*(?:万美金|万美元|万港币|万元|万|亿|million|billion|k|m|b))?|\d+(?:,\d{3})*(?:\.\d+)?\s*(?:万美金|万美元|万港币|万元|万|亿|美金|美元|港币|元|块|million|billion|k|m|b))/gi, '[REDACTED_VALUE]');
             redacted = redacted.replace(/([A-Za-z0-9\u4e00-\u9fa5]{2,16}(?:公司|集团|科技|资本|银行|厂|Inc\.?|Corp\.?|LLC|Ltd\.?|Ventures|Capital))/g, '[COMPANY_ENTITY]');
             const matches = redacted.match(/\[(?:REDACTED_\w+|COMPANY_ENTITY)\]/g);
             return {
@@ -1302,10 +1322,10 @@ HTML_UI = r"""<!DOCTYPE html>
                     phase: currentPhase,
                     lang: currentLang,
                     text: clientScrubbedText,
-                    user_goal: document.getElementById('user_goal').value,
-                    hard_bottom_line: document.getElementById('hard_bottom_line').value,
-                    risk_preference: document.getElementById('risk_preference').value,
-                    session_context: sessionMemory
+                    user_goal: clientSideRedact(document.getElementById('user_goal').value).sanitizedText,
+                    hard_bottom_line: clientSideRedact(document.getElementById('hard_bottom_line').value).sanitizedText,
+                    risk_preference: clientSideRedact(document.getElementById('risk_preference').value).sanitizedText,
+                    session_context: {}
                 };
 
                 const res = await fetch('/analyze', {
@@ -1345,7 +1365,16 @@ HTML_UI = r"""<!DOCTYPE html>
                     ? `🛡️ <strong>客户端本地预脱敏验证：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（原始敏感词未出设备） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际离开浏览器并发往模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
                     : `🛡️ <strong>Client-Side Sanitization Verified:</strong> <b>${localRedactedCount}</b> sensitive entities scrubbed in browser memory prior to network call | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Actual Sanitized Payload Sent:</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
 
-                document.getElementById('audit_view').innerHTML = auditMsg;
+                const audit = data.dealguard_audit || {};
+                const findings = (audit.findings || []).map(f => f.rule + ': ' + f.status +
+                    (f.observed === undefined ? '' : ' (observed: ' + f.observed + ')'));
+                const auditElement = document.createElement('pre');
+                auditElement.style.cssText = 'white-space:pre-wrap;padding:12px;border:1px solid #64748b;border-radius:8px;margin-top:8px';
+                auditElement.textContent = 'DealGuard deterministic audit: ' + (audit.assessment || 'UNKNOWN') +
+                    '\n' + findings.join('\n');
+                const auditView = document.getElementById('audit_view');
+                auditView.innerHTML = auditMsg;
+                auditView.appendChild(auditElement);
 
                 const badgeColor = t.risk_level === 'SAFE' ? '#059669' : (t.risk_level === 'LOW' ? '#d97706' : '#dc2626');
                 const riskMapZh = {
