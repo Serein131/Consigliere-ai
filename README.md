@@ -36,6 +36,7 @@ Regex redaction is incomplete; app/server/provider data-retention rules are not 
 ## Research and evaluation
 
 - [Measured synthetic test results](research/RESULTS.md)
+- [Actual 60-case Gemini comparison: results, error analysis, and critical caveats](research/GEMINI_COMPARISON_2026-11-02.md)
 - [Experiment methods](research/EXPERIMENT.md)
 - [Usability study protocol](research/user_test_protocol.md)
 - [Feedback form template](research/feedback_template.csv)
