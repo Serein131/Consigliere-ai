@@ -100,8 +100,10 @@ def audit_only():
         return jsonify({"error": "Expected a JSON object"}), 400
     text = str(payload.get("text") or "")[:12000]
     rules = str(payload.get("hard_bottom_line") or "")[:2000]
-    if not text.strip() or not rules.strip():
-        return jsonify({"error": "Both text and hard_bottom_line are required."}), 400
+    if not text.strip():
+        return jsonify({"error": "Deal proposal text is required."}), 400
+    if not rules.strip() and payload.get("structured_rules") is None:
+        return jsonify({"error": "Configure structured rules or hard_bottom_line."}), 400
     # Percentages / durations must remain measurable; identifiers and money are scrubbed.
     return jsonify(check_deal(
         server_fallback_redact(text)["sanitized_text"],
@@ -1109,7 +1111,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 notyet:'NOT YET CHECKED', violation:'RULE VIOLATION', unknown:'NEEDS VERIFICATION',
                 pass:'NO DETECTED VIOLATION', checks:'checks', failures:'violations',
                 foot:'Checks only supported, explicitly stated rules. No detected violation does not mean the deal is commercially or legally safe.',
-                error:'Audit failed: ', missing:'Enter proposed terms and hard bottom lines first.',
+                error:'Audit failed: ', missing:'Enter a proposal to audit.',
                 rules:{maximum_discount_pct:'Maximum discount',payment_days:'Payment days',no_exclusivity:'Exclusivity prohibited'},
                 states:{VIOLATION:'VIOLATION',PASS:'PASS',UNKNOWN:'UNKNOWN'},
                 observed:'Observed', limit:'Threshold', min:'Minimum', max:'Maximum',
@@ -1135,7 +1137,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 notyet:'尚未检查',violation:'发现底线违规',unknown:'需要进一步核实',
                 pass:'未发现规则冲突',checks:'项检查',failures:'项违规',
                 foot:'只检查已支持且能够识别的明确规则。未发现违规不代表交易在法律或商业上安全。',
-                error:'审计失败：',missing:'请先填写交易底线和对方提出的条件。',
+                error:'审计失败：',missing:'请先填写对方提出的交易条件。',
                 rules:{maximum_discount_pct:'最大折扣',payment_days:'付款期限',no_exclusivity:'禁止独家'},
                 states:{VIOLATION:'违规',PASS:'符合',UNKNOWN:'未知'},
                 observed:'观察值',limit:'阈值',min:'下限',max:'上限',
@@ -1228,7 +1230,7 @@ HTML_UI = r"""<!DOCTYPE html>
             output.style.display='block';findings.replaceChildren();counter.textContent='';
             const text=document.getElementById('input_text').value;
             const rules=document.getElementById('hard_bottom_line').value;
-            if(!text.trim() || !rules.trim()){
+            if(!text.trim()){
                 status.className='dg-status unknown';status.textContent=l.missing;return;
             }
             btn.disabled=true;status.className='dg-status unknown';status.textContent=l.pending;
@@ -1598,8 +1600,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 updatePillarHeaders();
 
                 const auditMsg = currentLang === 'zh'
-                    ? `🛡️ <strong>客户端正则脱敏已运行（不能保证覆盖全部敏感信息）：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（无法确保所有敏感信息已删除） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际离开浏览器并发往模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
-                    : `🛡️ <strong>Regex-based redaction applied (not a complete privacy guarantee):</strong> <b>${localRedactedCount}</b> possible identifiers replaced by client regex before network request | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Actual Sanitized Payload Sent:</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
+                    ? `🛡️ <strong>客户端正则脱敏已运行（不能保证覆盖全部敏感信息）：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（无法确保所有敏感信息已删除） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>发送到分析接口的谈判文本（不含全部上下文）：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
+                    : `🛡️ <strong>Regex-based redaction applied (not a complete privacy guarantee):</strong> <b>${localRedactedCount}</b> possible identifiers replaced by client regex before network request | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Negotiation text excerpt (not full request):</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
 
                 const audit = data.dealguard_audit || {};
                 const findings = (audit.findings || []).map(f => f.rule + ': ' + f.status +
