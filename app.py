@@ -1528,16 +1528,98 @@ HTML_UI = r"""<!DOCTYPE html>
             button.focus({preventScroll:true});
         }
 
-        function setPhase(phase) {
-            currentPhase = phase;
-            ['pre_deal', 'in_deal', 'post_deal'].forEach(p => {
-                document.getElementById('tab_' + p).className = 'phase-tab' + (p === phase ? ' active' : '');
-            });
-            updatePillarHeaders();
+        const STAGE_COPY = {
+            en:{
+                pre_deal:{
+                    badge:'01 · PREPARE',title:'Meeting background',
+                    hint:'Write fictional meeting context, identify constraints, then request a preparation strategy.',
+                    input:'Meeting notes / counterpart background',
+                    placeholder:'Who is involved? What decision or deadline is coming up?',
+                    action:'Prepare negotiation strategy',
+                    note:'Your goals and guardrails stay available in every stage. Strategy analysis requires an explicit click.'
+                },
+                in_deal:{
+                    badge:'02 · PROTECT',title:'Live deal terms / transcript',
+                    hint:'Type, paste, or voluntarily transcribe a short negotiation excerpt into this one input.',
+                    input:'Current offer, chat excerpt or live transcript',
+                    placeholder:'Buyer requests 15% discount, net 90 days and exclusivity…',
+                    action:'Generate tactical counter-question',
+                    note:'Audit the same text below, then optionally request a separate AI response. No automatic model calls.'
+                },
+                post_deal:{
+                    badge:'03 · DEBRIEF',title:'Post-meeting notes / voice memo',
+                    hint:'Recall what was offered, rejected or verbally promised. Compare with the same guardrails.',
+                    input:'Debrief notes or 60-second voice memo transcript',
+                    placeholder:'We rejected exclusivity, but may have offered a 15% discount. Draft a clarification email…',
+                    action:'Review commitments and draft follow-up',
+                    note:'The agent can use prior phase summaries if generated earlier. No email is automatically sent.'
+                }
+            },
+            zh:{
+                pre_deal:{
+                    badge:'01 · 谈判前',title:'本次会议背景',
+                    hint:'填写虚构会议背景，确认目标和底线，再主动生成会前准备策略。',
+                    input:'会议背景 / 对方情况',
+                    placeholder:'即将和谁谈？对方可能提出什么条件？需要守住什么底线？',
+                    action:'生成会前谈判策略',
+                    note:'目标与底线在三个阶段共享；点击后才会调用 AI 生成会前策略。'
+                },
+                in_deal:{
+                    badge:'02 · 谈判中',title:'实时交易条款 / 语音转写',
+                    hint:'手动输入、粘贴或主动开启语音转写，内容共用同一个文本框。',
+                    input:'当前报价、聊天片段或谈判转写',
+                    placeholder:'买方要求15%折扣、90天付款，以及12个月独家合作……',
+                    action:'生成当场反问和谈判建议',
+                    note:'在下方用相同文本核验底线，再自主选择生成策略；不自动调用模型。'
+                },
+                post_deal:{
+                    badge:'03 · 谈判后',title:'谈判复盘 / 60秒口述',
+                    hint:'回忆哪些条件被提出、拒绝或口头答应，并和之前设定的底线对照。',
+                    input:'复盘笔记 / 语音备忘转写',
+                    placeholder:'今天拒绝了独家要求，但我可能口头答应了15%折扣，需要邮件澄清……',
+                    action:'复盘承诺并生成跟进邮件',
+                    note:'如果之前生成过策略，助手会引用阶段摘要；不会自动发送邮件。'
+                }
+            }
+        };
+
+        function refreshStageView() {
+            const phase=currentPhase;
+            const l=STAGE_COPY[currentLang][phase];
+            for (const p of ['pre_deal','in_deal','post_deal']) {
+                const button=document.getElementById('tab_'+p);
+                button.classList.toggle('active',p===phase);
+                if(p===phase)button.setAttribute('aria-current','step');
+                else button.removeAttribute('aria-current');
+            }
+            document.getElementById('stage_prepare').style.display=phase==='pre_deal'?'block':'none';
+            document.getElementById('stage_live_audit').style.display=phase==='in_deal'?'block':'none';
+            document.getElementById('stage_mode_badge').textContent=l.badge;
+            document.getElementById('dg_proposal_label').textContent=l.title;
+            document.getElementById('stage_hint').textContent=l.hint;
+            document.getElementById('lbl_input_text').textContent=l.input;
+            document.getElementById('input_text').placeholder=l.placeholder;
+            document.getElementById('run_btn').textContent=l.action;
+            document.getElementById('agent_mode_note').textContent=l.note;
             renderPresets();
-            const firstKey = Object.keys(STAGE_PRESETS[currentLang][currentPhase])[0];
-            loadPreset(firstKey);
-            document.getElementById('result').style.display = 'none';
+            updatePillarHeaders();
+            updateSessionUI();
+            updateDealCharCount();
+            if(typeof updateMicUI==='function')updateMicUI();
+        }
+
+        function setPhase(phase) {
+            if(!['pre_deal','in_deal','post_deal'].includes(phase))return;
+            // Stopping transcription on navigation never invokes model inference.
+            if(isListening)stopMicInternal();
+            const editor=document.getElementById('input_text');
+            stageDrafts[currentPhase]=editor.value;
+            currentPhase=phase;
+            editor.value=stageDrafts[phase]||'';
+            invalidateDealAudit();
+            document.getElementById('result').style.display='none';
+            document.getElementById('error_box').style.display='none';
+            refreshStageView();
         }
 
         function updatePillarHeaders() {
@@ -1579,10 +1661,16 @@ HTML_UI = r"""<!DOCTYPE html>
             document.getElementById('btn_en').className = 'lang-btn' + (lang === 'en' ? ' active' : '');
             document.getElementById('btn_zh').className = 'lang-btn' + (lang === 'zh' ? ' active' : '');
 
-            document.getElementById('user_goal').value = PROFILES[lang].goal;
-            document.getElementById('hard_bottom_line').value = PROFILES[lang].bottom;
-            document.getElementById('risk_preference').value = PROFILES[lang].risk;
-            document.getElementById('voice_lang').value = lang === 'en' ? 'en-US' : 'zh-CN';
+            // Initialize example text once; language switching must never erase user edits.
+            if(!languageInitialized){
+                if(lang==='zh'){
+                    document.getElementById('user_goal').value=PROFILES.zh.goal;
+                    document.getElementById('hard_bottom_line').value=PROFILES.zh.bottom;
+                    document.getElementById('risk_preference').value=PROFILES.zh.risk;
+                }
+                document.getElementById('voice_lang').value=lang==='en'?'en-US':'zh-CN';
+                languageInitialized=true;
+            }
 
             if (lang === 'zh') {
                 document.getElementById('subtitle_text').innerText = "明确底线 · 审计交易条款 · 选择谈判方案";
@@ -1638,14 +1726,13 @@ HTML_UI = r"""<!DOCTYPE html>
 
             updatePillarHeaders();
             updateSessionUI();
-            // Previous unsourced version metrics removed.
-            renderPresets();
-            const firstKey = Object.keys(STAGE_PRESETS[currentLang][currentPhase])[0];
-            loadPreset(firstKey);
+            // New workflow has only one editor; never auto-load an example on language changes.
+            refreshStageView();
         }
 
         function renderPresets() {
             const container = document.getElementById('preset_container');
+            container.style.display=currentPhase==='in_deal'?'none':'flex';
             if (currentPhase === 'pre_deal') {
                 container.innerHTML = currentLang === 'zh'
                     ? `<button type="button" class="preset-btn" onclick="loadPreset('p1')">📅 战前案例 1：强势投资人/客户排他逼签预警</button>
@@ -1653,11 +1740,8 @@ HTML_UI = r"""<!DOCTYPE html>
                     : `<button type="button" class="preset-btn" onclick="loadPreset('p1')">📅 Pre-Deal 1: Hostile VC Exclusivity & Bait Wargame</button>
                        <button type="button" class="preset-btn" onclick="loadPreset('p2')">📅 Pre-Deal 2: Procurement Net-15 Terms Defense</button>`;
             } else if (currentPhase === 'in_deal') {
-                container.innerHTML = currentLang === 'zh'
-                    ? `<button type="button" class="preset-btn" onclick="loadPreset('trap')">🔥 战中案例 1：高危复合陷阱（压价25%+排他+假死线）</button>
-                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ 战中案例 2：良性对齐沟通（正常交易基线）</button>`
-                    : `<button type="button" class="preset-btn" onclick="loadPreset('trap')">🔥 Live Case 1: Ultimatum Trap (25% Cut + Exclusivity)</button>
-                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ Live Case 2: Benign Alignment (Benign Baseline)</button>`;
+                // Stage 2 has exactly two audited fictional examples in the Protect panel.
+                container.replaceChildren();
             } else {
                 container.innerHTML = currentLang === 'zh'
                     ? `<button type="button" class="preset-btn" onclick="loadPreset('slippage')">🚨 战后案例 1：现场口头松口越界（急需邮件附加条件找补）</button>
@@ -1668,8 +1752,14 @@ HTML_UI = r"""<!DOCTYPE html>
         }
 
         function loadPreset(key) {
-            const val = STAGE_PRESETS[currentLang][currentPhase][key];
-            if (val) document.getElementById('input_text').value = val;
+            const val=STAGE_PRESETS[currentLang][currentPhase][key];
+            if(!val)return;
+            const editor=document.getElementById('input_text');
+            editor.value=val;
+            stageDrafts[currentPhase]=val;
+            updateDealCharCount();
+            invalidateDealAudit();
+            document.getElementById('result').style.display='none';
         }
 
         function clientSideRedact(rawText) {
