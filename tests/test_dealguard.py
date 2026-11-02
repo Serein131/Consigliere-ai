@@ -93,5 +93,12 @@ class DealGuardTests(unittest.TestCase):
     def test_chinese_cancel_exclusive(self):
         self.check_state("我们取消独家合作","no_exclusivity","PASS")
 
+    def test_en_reduce_price_phrase(self):
+        self.check_state("Please reduce price by 12%.", "maximum_discount_pct", "VIOLATION")
+    def test_zh_price_down_phrase(self):
+        self.check_state("对方要求价格下调12%。", "maximum_discount_pct", "VIOLATION")
+    def test_zh_exclusivity_not_discussed(self):
+        self.check_state("会议尚未讨论排他问题。", "no_exclusivity", "UNKNOWN")
+
 if __name__ == "__main__":
     unittest.main()

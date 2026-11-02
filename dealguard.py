@@ -8,7 +8,7 @@ import re
 
 PCT = r"(\d{1,3}(?:\.\d+)?)\s*(?:%|％)"
 DAYS = r"(\d{1,4})\s*(?:days?|天)"
-DISCOUNT = r"(?:discount|price\s+(?:cut|reduction)|降价(?:幅度)?|折扣|优惠)"
+DISCOUNT = r"(?:discount|price\s+(?:cut|reduction)|reduce\s+(?:the\s+)?price|降价(?:幅度)?|价格下调|折扣|优惠)"
 PAYMENT = r"(?:payment\s+terms?|payment\s+period|net\s+terms?|账期|付款期限|付款周期|回款周期)"
 EXCLUSIVITY = re.compile(r"\bexclusiv(?:e|ity)\b|独家|排他", re.I)
 NEGATIVE_EXCLUSIVE = re.compile(
@@ -17,6 +17,11 @@ NEGATIVE_EXCLUSIVE = re.compile(
     r"\bexclusiv(?:e|ity)\b|"
     r"(?:不(?:接受|同意|需要|要求|签)|拒绝|取消|撤销|没有|无需|无|不含|不包括).{0,9}(?:独家|排他)|"
     r"(?:独家|排他).{0,5}(?:已取消|不接受|取消)", re.I)
+UNADDRESSED_EXCLUSIVE = re.compile(
+    r"\b(?:not\s+(?:been\s+)?discussed|not\s+mentioned|never\s+discussed|"
+    r"not\s+yet\s+discussed|not\s+addressed)\b.{0,45}\bexclusiv(?:e|ity)\b|"
+    r"(?:尚未|还未|未|没有)(?:正式)?(?:讨论|涉及|商定|决定).{0,12}(?:独家|排他)|"
+    r"(?:独家|排他).{0,12}(?:尚未|还未|未|没有)(?:讨论|涉及|商定|决定)", re.I)
 REJECTED = re.compile(r"\b(?:reject(?:ed)?|refus(?:e|ed)|declin(?:e|ed)|won'?t\s+accept|not\s+accept(?:ed)?|turned\s+down)\b|拒绝|不接受|已否决|不考虑|不予接受|撤回", re.I)
 HISTORICAL = re.compile(r"\b(?:initially|originally|previously|earlier|formerly|used\s+to)\b|最初|原先|此前|之前|曾经|起初", re.I)
 CONFIRMED = re.compile(r"\b(?:agreed|accepted|settled|finalized|confirmed|signed|final)\b|最终|敲定|已同意|正式接受|确认", re.I)
@@ -167,9 +172,11 @@ def _exclusive_check(clauses):
     hits=[]
     for i,clause in enumerate(clauses):
         if EXCLUSIVITY.search(clause):
+            unaddressed=bool(UNADDRESSED_EXCLUSIVE.search(clause))
             negated=bool(NEGATIVE_EXCLUSIVE.search(clause))
-            hits.append({"rule":"no_exclusivity","status":"PASS" if negated else "VIOLATION",
-                         "evidence":clause[:120],"claim_status":"REJECTED" if negated else _phase(clause),
+            status="UNKNOWN" if unaddressed else ("PASS" if negated else "VIOLATION")
+            hits.append({"rule":"no_exclusivity","status":status,
+                         "evidence":clause[:120],"claim_status":"UNADDRESSED" if unaddressed else ("REJECTED" if negated else _phase(clause)),
                          "clause_index":i})
     if not hits:
         return {"rule":"no_exclusivity","status":"UNKNOWN","reason":"Exclusivity not addressed."}

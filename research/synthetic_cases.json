@@ -1,0 +1,926 @@
+{
+  "dataset_name": "consigliere_dealguard_synthetic_v1",
+  "schema_version": 1,
+  "created_by": "assistant-generated synthetic evaluation fixtures; not independent human labels",
+  "limitations": "Programmatically assembled small targeted patterns; not an unbiased sample of real contracts. Some expected labels may require adjudication.",
+  "cases": [
+    {
+      "id": "DG-001",
+      "category": "discount",
+      "language": "en",
+      "proposal": "The customer requests a 15% discount.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-002",
+      "category": "discount",
+      "language": "en",
+      "proposal": "We can offer a 10% discount.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-003",
+      "category": "discount",
+      "language": "en",
+      "proposal": "The requested discount is 8%.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-004",
+      "category": "discount",
+      "language": "en",
+      "proposal": "Please reduce price by 12%.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-005",
+      "category": "discount",
+      "language": "en",
+      "proposal": "We rejected the 20% discount.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-006",
+      "category": "discount",
+      "language": "en",
+      "proposal": "A 15% discount was previously discussed.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-007",
+      "category": "discount",
+      "language": "en",
+      "proposal": "Initially requested 15% discount; finally agreed 8% discount.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-008",
+      "category": "discount",
+      "language": "en",
+      "proposal": "We requested 15% discount; another email proposes 8% discount.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-009",
+      "category": "discount",
+      "language": "en",
+      "proposal": "Let's discuss pricing after the demo.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-010",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "客户要求15%折扣。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-011",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "双方同意8%折扣。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-012",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "我们不接受15%折扣。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-013",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "最初要求15%折扣；最终同意8%折扣。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-014",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "对方要求价格下调12%。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-015",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Payment terms 90 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-016",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Payment terms 45 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-017",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Payment terms 30 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-018",
+      "category": "payment",
+      "language": "en",
+      "proposal": "The customer requests net 60 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-019",
+      "category": "payment",
+      "language": "en",
+      "proposal": "We rejected payment terms 90 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-020",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Initially proposed payment terms 90 days; finally agreed payment terms 30 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-021",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Payment terms 30 days; payment terms 90 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-022",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Payment due after contract signature, date to be agreed.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-023",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "客户要求付款期限90天。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-024",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "最终同意付款期限40天。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-025",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "客户提出账期60天。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-026",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "我们拒绝付款期限90天。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-027",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Payment terms 90 days.",
+      "structured_rules": {
+        "role": "buyer",
+        "payment_direction": "minimum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-028",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Payment terms 10 days.",
+      "structured_rules": {
+        "role": "buyer",
+        "payment_direction": "minimum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "short_payables"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-029",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "We require an exclusivity agreement.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-030",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "No exclusivity will be required.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-031",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "We reject exclusivity.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-032",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "We accepted an exclusivity clause.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-033",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "Exclusivity was considered previously.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-034",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "The proposal does not discuss this topic.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-035",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "Exclusivity was requested; we later rejected exclusivity.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-036",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "客户要求独家合作。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-037",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "我们不接受独家合作。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-038",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "双方取消独家条款。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-039",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "此前讨论过独家合作。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-040",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "目前需要独家授权。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-041",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "我们不要求任何排他条款。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-042",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "会议尚未讨论排他问题。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-043",
+      "category": "commercial_separate",
+      "language": "en",
+      "proposal": "Payment terms 90 days.",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-044",
+      "category": "commercial_separate",
+      "language": "en",
+      "proposal": "Payment terms 30 days.",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-045",
+      "category": "commercial_separate",
+      "language": "en",
+      "proposal": "Payment terms 10 days.",
+      "structured_rules": {
+        "role": "buyer",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "short_payables"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-046",
+      "category": "commercial_separate",
+      "language": "en",
+      "proposal": "Payment terms 60 days.",
+      "structured_rules": {
+        "role": "buyer",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-047",
+      "category": "commercial_separate",
+      "language": "en",
+      "proposal": "The deal includes unlimited liability.",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "unlimited_liability"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-048",
+      "category": "commercial_separate",
+      "language": "zh",
+      "proposal": "合同存在无限责任赔偿。",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "unlimited_liability"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-049",
+      "category": "commercial_separate",
+      "language": "en",
+      "proposal": "Automatic renewal is in the contract.",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "auto_renewal"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-050",
+      "category": "commercial_separate",
+      "language": "zh",
+      "proposal": "合同约定自动续约。",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "auto_renewal"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-051",
+      "category": "commercial_separate",
+      "language": "en",
+      "proposal": "Early termination penalty applies.",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "termination_penalty"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-052",
+      "category": "commercial_separate",
+      "language": "zh",
+      "proposal": "合同包含提前终止违约金。",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "termination_penalty"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-053",
+      "category": "commercial_separate",
+      "language": "en",
+      "proposal": "We will confirm milestones by email.",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-054",
+      "category": "commercial_separate",
+      "language": "zh",
+      "proposal": "对方说明下周进行产品评审。",
+      "structured_rules": {
+        "role": "seller",
+        "prohibit_exclusivity": false
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-055",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "15% discount; payment terms 90 days; exclusivity agreement.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION",
+        "payment_days": "VIOLATION",
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-056",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "10% discount; payment terms 45 days; no exclusivity.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS",
+        "payment_days": "PASS",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-057",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "We rejected the 15% discount; payment terms 40 days; no exclusivity.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN",
+        "payment_days": "PASS",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-058",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "对方要求15%折扣；付款期限90天；要求独家合作。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION",
+        "payment_days": "VIOLATION",
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-059",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "最终同意8%折扣；付款期限40天；没有独家合作。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS",
+        "payment_days": "PASS",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    },
+    {
+      "id": "DG-060",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "客户要求15%折扣；我方拒绝独家合作；账期问题还没商定。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION",
+        "payment_days": "UNKNOWN",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": ""
+    }
+  ]
+}

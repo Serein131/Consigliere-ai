@@ -33,6 +33,17 @@ Regex parsing cannot resolve all legal negations, counteroffers, participant att
 
 Regex redaction is incomplete; app/server/provider data-retention rules are not independently verified. Speech recognition may involve third-party processing. Use only synthetic cases and obtain needed recording consent.
 
+## Research and evaluation
+
+- [Measured synthetic test results](research/RESULTS.md)
+- [Experiment methods](research/EXPERIMENT.md)
+- [Usability study protocol](research/user_test_protocol.md)
+- [Feedback form template](research/feedback_template.csv)
+- [Standard cases](research/synthetic_cases.json)
+- [Harder challenge cases](research/challenge_cases.json)
+
+The fixtures are synthetic and are not production accuracy evidence. The Gemini comparison and live user recruitment remain future work.
+
 ## Portfolio
 
 Show one clearly violating case, one rejected offer, one compliant case, and a separate commercial-risk flag. State AI-assisted implementation and your own decisions/test contributions accurately.
