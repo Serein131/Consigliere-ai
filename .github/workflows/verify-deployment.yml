@@ -1,0 +1,54 @@
+name: Verify Public Vercel Hybrid Release (No Gemini Usage)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-deployment.yml'
+      - 'app.py'
+      - 'hybrid_service.py'
+permissions:
+  contents: read
+jobs:
+  site-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check deployed v5.2 UI + public fallback and consent guard
+        run: |
+          python - <<'PY'
+          import json,time,urllib.request,urllib.error,sys
+          base="https://consigliere-ai-seven.vercel.app"
+          rules={"role":"seller","discount_max_pct":10,"payment_days":45,
+                 "payment_direction":"maximum","prohibit_exclusivity":True}
+          text="Buyer requests a 15% discount, payment terms 90 days, and exclusivity."
+          def fetch(path, data=None):
+              hdr={"User-Agent":"Consigliere-Deployment-Check/1.0"}
+              if data is not None:hdr["Content-Type"]="application/json"
+              request=urllib.request.Request(base+path,
+                  data=json.dumps(data).encode("utf-8") if data is not None else None,
+                  method="POST" if data is not None else "GET",headers=hdr)
+              try:
+                  with urllib.request.urlopen(request,timeout=12) as r:
+                      return r.status,r.read(120000).decode("utf-8","replace")
+              except urllib.error.HTTPError as e:
+                  return e.code,e.read(4000).decode("utf-8","replace")
+          for n in range(9):
+              try:
+                  status,html=fetch("/?release_check=v52")
+                  if status!=200 or "v5.2 · Founder DealGuard" not in html or "dg_hybrid_btn" not in html:
+                      raise ValueError("VERSION_NOT_YET_VISIBLE")
+                  code,body=fetch("/audit",{"text":text,"structured_rules":rules})
+                  if code!=200 or json.loads(body).get("violation_count")!=3:
+                      raise ValueError("RULES_ONLY_API_NOT_READY")
+                  code,body=fetch("/hybrid-audit",{"text":text,"structured_rules":rules,
+                        "consent_to_model_processing":False})
+                  if code!=400 or json.loads(body).get("error")!="MODEL_CONSENT_REQUIRED":
+                      raise ValueError("HYBRID_CONSENT_GUARD_NOT_READY")
+                  print("PUBLIC_V52_SMOKE_PASS UI=200 RULES=3 CONSENT_GUARD=400")
+                  sys.exit(0)
+              except Exception as exc:
+                  print("Public Vercel check",n+1,"not ready:",type(exc).__name__,
+                        str(exc)[:80],flush=True)
+              if n<8:time.sleep(12)
+          raise SystemExit("PUBLIC_V52_DEPLOYMENT_NOT_VERIFIED")
+          PY
