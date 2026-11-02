@@ -18,7 +18,6 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from dealguard import check_deal
 from evidence_hybrid import audit_extraction,to_prediction
-from run_gemini_baseline import classify as gemini_baseline
 
 RULE_NAMES=("maximum_discount_pct","payment_days","no_exclusivity")
 RISK_NAMES=("long_receivables","short_payables","unlimited_liability","auto_renewal","termination_penalty")
@@ -60,6 +59,27 @@ def _request(url, body, headers):
         headers=headers, method="POST")
     with urllib.request.urlopen(req,timeout=55) as response:
         return json.load(response)
+
+def _gemini_direct(case, key, model):
+    # Identical task instruction and user JSON as GPT, aside from provider transport.
+    prompt=json.dumps({"structured_rules":case["structured_rules"],
+                       "proposal":case["proposal"]},ensure_ascii=False)
+    payload={
+        "systemInstruction":{"parts":[{"text":MODEL_PROMPT}]},
+        "contents":[{"role":"user","parts":[{"text":prompt}]}],
+        "generationConfig":{"temperature":0,"responseMimeType":"application/json"}
+    }
+    doc=_request("https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",
+        payload,{"Content-Type":"application/json","x-goog-api-key":key})
+    text="".join(x.get("text","") for x in doc["candidates"][0]["content"]["parts"])
+    result=json.loads(text)
+    states=result.get("predicted_rule_status",{})
+    risks=result.get("predicted_commercial_risks",[])
+    if not isinstance(states,dict) or not isinstance(risks,list):
+        raise ValueError("Gemini returned unexpected JSON shape")
+    states={k:v for k,v in states.items() if k in RULE_NAMES and v in ("PASS","VIOLATION","UNKNOWN")}
+    risks=sorted(set(x for x in risks if x in RISK_NAMES))
+    return {"id":case["id"],"predicted_rule_status":states,"predicted_commercial_risks":risks}
 
 def _gemini_extract(text, key, model):
     payload={
@@ -103,7 +123,7 @@ def _openai_direct(case, key, model):
 
 def _predict(case,mode,gemini_key,openai_key,gemini_model,gpt_model):
     if mode=="gemini":
-        return gemini_baseline(case,gemini_key,gemini_model)
+        return _gemini_direct(case,gemini_key,gemini_model)
     if mode=="gpt":
         return _openai_direct(case,openai_key,gpt_model)
     if mode=="rules":
