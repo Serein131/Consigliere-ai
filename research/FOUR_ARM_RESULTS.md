@@ -1,8 +1,29 @@
 # Four-arm evaluation · measured 2026-11-02
 
+## Update: OpenAI key added, but GPT remains unmeasured (API billing blocked)
+
+**2026-11-02, GitHub Actions run [#41422998049, attempt 2](https://github.com/Serein131/Consigliere-ai/actions/runs/41422998049/attempts/2):** GitHub successfully loaded the user's `OPENAI_API_KEY` secret. The GPT-6 Luna baseline sent a real request but received **HTTP 429** on its very first scenario; there are **zero valid GPT predictions**, so arm B is still **NOT_RUN**, not 0% accuracy.
+
+A separate one-request [diagnostic run #41427929940](https://github.com/Serein131/Consigliere-ai/actions/runs/41427929940) classified the provider response as **`credit_balance_exhausted` / `insufficient_quota`** without printing the key, raw error message or provider identifiers. This is an API **billing/credit** problem, **not** a bad API-key format or temporary request-rate limit. Additional retries cannot repair an exhausted prepaid API balance.
+
+To finish arm B after the owner resolves OpenAI Platform billing, use the [GPT-only completion workflow](../.github/workflows/gpt-only-completion.yml) or [iPad instructions](FOUR_ARM_SETUP.md). It reuses the exact saved A/C/D predictions, so there is no need to spend Gemini quota again. The preserved artifact must still be available in GitHub Actions (30-day retention).
+
+### Two completed A/C/D inference attempts (same 24 synthetic cases; no rule/label changes)
+
+| Run | Gemini direct A | DealGuard C | Hybrid D | GPT B |
+|---|---:|---:|---:|---|
+| Attempt 1, before GPT key | **21/24** | **11/24** | **22/24** | NOT_RUN: no key |
+| Attempt 2, with key and no API credits | **22/24** | **11/24** | **22/24** | NOT_RUN: credit balance exhausted |
+
+The same Gemini model changed by one exact case across repeats, despite deterministic settings; **the apparent hybrid advantage disappears on attempt 2**. This demonstrates why a one-case gap is not sufficient for broad claims. Both attempts' raw predictions are archived as distinct GitHub Actions artifacts; the latest saved artifact is ID `13132523079`.
+
+The historical description below refers to the **first completed A/C/D attempt**, not a completed four-provider run.
+
+
+
 **Status:** Three independent arms ran to **24/24 completion**. The fourth (OpenAI GPT) was **NOT_RUN** because this GitHub repository had no `OPENAI_API_KEY` secret at run time.
 
-**Actual run:** [GitHub Actions #41422998049](https://github.com/Serein131/Consigliere-ai/actions/runs/41422998049) · Completed successfully. The downloadable `four-arm-measured-and-provider-availability` artifact includes 24 raw Gemini predictions, 24 raw hybrid predictions with extracted evidence/audit records, 24 rule-engine predictions, an exact-case CSV, machine-readable JSON summary, and formatted Markdown. Artifacts expire; preserve a copy if needed.
+**Original A/C/D-only attempt (attempt 1):** [GitHub Actions #41422998049](https://github.com/Serein131/Consigliere-ai/actions/runs/41422998049) · A/C/D steps completed; the overall run now displays failure because a later attempt tried GPT without available credits. The downloadable `four-arm-measured-and-provider-availability` artifact includes 24 raw Gemini predictions, 24 raw hybrid predictions with extracted evidence/audit records, 24 rule-engine predictions, an exact-case CSV, machine-readable JSON summary, and formatted Markdown. Artifacts expire; preserve a copy if needed.
 
 **Dataset:** [four_arm_frozen_24.json](cases/four_arm_frozen_24.json) — 24 English and Chinese synthetic deal snippets, fixed before scoring. These examples and labels were **AI-assisted and not independently expert-adjudicated**. They are not real contracts or production accuracy estimates.
 
