@@ -1,12 +1,15 @@
 # Four-arm evaluation · measured 2026-11-02
 
+> **Portfolio scope update:** The owner has decided not to fund additional OpenAI API credits, so the active study is the **three completed systems (A, C and D)**. See the concise [three-system results](THREE_SYSTEM_RESULTS.md). GPT remains an archived, attempted but **unmeasured** fourth arm; no further payment or rerun is required.
+
+
 ## Update: OpenAI key added, but GPT remains unmeasured (API billing blocked)
 
 **2026-11-02, GitHub Actions run [#41422998049, attempt 2](https://github.com/Serein131/Consigliere-ai/actions/runs/41422998049/attempts/2):** GitHub successfully loaded the user's `OPENAI_API_KEY` secret. The GPT-6 Luna baseline sent a real request but received **HTTP 429** on its very first scenario; there are **zero valid GPT predictions**, so arm B is still **NOT_RUN**, not 0% accuracy.
 
 A separate one-request [diagnostic run #41427929940](https://github.com/Serein131/Consigliere-ai/actions/runs/41427929940) classified the provider response as **`credit_balance_exhausted` / `insufficient_quota`** without printing the key, raw error message or provider identifiers. This is an API **billing/credit** problem, **not** a bad API-key format or temporary request-rate limit. Additional retries cannot repair an exhausted prepaid API balance.
 
-To finish arm B after the owner resolves OpenAI Platform billing, use the [GPT-only completion workflow](../.github/workflows/gpt-only-completion.yml) or [iPad instructions](FOUR_ARM_SETUP.md). It reuses the exact saved A/C/D predictions, so there is no need to spend Gemini quota again. The preserved artifact must still be available in GitHub Actions (30-day retention).
+An optional [GPT-only completion workflow](../.github/workflows/gpt-only-completion.yml) is retained for archival reproducibility, but **is not an active project requirement**. The current study is complete with A, C and D, and no API funding is expected.
 
 ### Two completed A/C/D inference attempts (same 24 synthetic cases; no rule/label changes)
 
