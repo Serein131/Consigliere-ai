@@ -114,7 +114,17 @@ def analyze_negotiation():
     user_goal = server_fallback_redact(user_goal)["sanitized_text"]
     hard_bottom_line = server_fallback_redact(hard_bottom_line)["sanitized_text"]
     risk_preference = server_fallback_redact(risk_preference)["sanitized_text"]
-    session_context = {}  # Do not transmit previously generated free-text drafts.
+    if isinstance(session_context, dict):
+        session_context = {
+            phase: {
+                key: server_fallback_redact(str((session_context.get(phase) or {}).get(key) or "")[:300])["sanitized_text"]
+                for key in ("trap", "rule")
+            }
+            for phase in ("pre_deal", "in_deal")
+            if isinstance(session_context.get(phase), dict)
+        }
+    else:
+        session_context = {}
 
 
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -132,7 +142,7 @@ The UI language is English. ALL values in your JSON output MUST be in fluent, ex
     asr_fuzzy_repair_instruction = """
 ACOUSTIC NOISE & TRANSCRIPT FAULT-TOLERANCE:
 The input transcript may be captured live from a conference room and contain minor acoustic homophones, dropped characters, or misheard commercial jargon. 
-You MUST cross-reference the input with the User's Strategic Profile (Goals, Bottom Lines, Opponent Name) to reconstruct the opponent's true adversarial intent before conducting game-theoretic deduction."""
+You MUST cross-reference the input with the User's Strategic Profile (Goals, Bottom Lines, Opponent Name) to flag potentially ambiguous words, without inventing missing facts or asserting hidden motives as facts."""
 
     phase_instructions = {
         "pre_deal": """CURRENT STAGE: PHASE 1 — T-15m PRE-DEAL BRIEFING & WARGAMING (战前15分钟沙盘预警).
@@ -1325,7 +1335,12 @@ HTML_UI = r"""<!DOCTYPE html>
                     user_goal: clientSideRedact(document.getElementById('user_goal').value).sanitizedText,
                     hard_bottom_line: clientSideRedact(document.getElementById('hard_bottom_line').value).sanitizedText,
                     risk_preference: clientSideRedact(document.getElementById('risk_preference').value).sanitizedText,
-                    session_context: {}
+                    session_context: Object.fromEntries(['pre_deal', 'in_deal']
+                        .filter(k => sessionMemory[k])
+                        .map(k => [k, {
+                            trap: clientSideRedact(sessionMemory[k].trap || '').sanitizedText,
+                            rule: clientSideRedact(sessionMemory[k].rule || '').sanitizedText
+                        }]))
                 };
 
                 const res = await fetch('/analyze', {
@@ -1362,8 +1377,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 updatePillarHeaders();
 
                 const auditMsg = currentLang === 'zh'
-                    ? `🛡️ <strong>客户端本地预脱敏验证：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（原始敏感词未出设备） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际离开浏览器并发往模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
-                    : `🛡️ <strong>Client-Side Sanitization Verified:</strong> <b>${localRedactedCount}</b> sensitive entities scrubbed in browser memory prior to network call | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Actual Sanitized Payload Sent:</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
+                    ? `🛡️ <strong>客户端正则脱敏已运行（不能保证覆盖全部敏感信息）：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（原始敏感词未出设备） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际离开浏览器并发往模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
+                    : `🛡️ <strong>Regex-based redaction applied (not a complete privacy guarantee):</strong> <b>${localRedactedCount}</b> sensitive entities scrubbed in browser memory prior to network call | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Actual Sanitized Payload Sent:</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
 
                 const audit = data.dealguard_audit || {};
                 const findings = (audit.findings || []).map(f => f.rule + ': ' + f.status +
