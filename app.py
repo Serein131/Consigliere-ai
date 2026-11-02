@@ -895,7 +895,7 @@ HTML_UI = r"""<!DOCTYPE html>
             <h2 id="dg_panel_title">01 / Independent deal audit</h2>
             <span class="dg-label" id="dg_no_llm">NO GEMINI CALL REQUIRED</span>
         </div>
-        <p id="dg_panel_desc">Uses your Hard Bottom Lines and the proposal text below. Detects explicit discount, payment-window, and exclusivity rule conflicts. The rules are inspectable and conservative.</p>
+        <p id="dg_panel_desc">Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.</p>
         <div class="dg-config">
             <div><label for="dg_role" id="dg_role_label">Deal perspective</label><select id="dg_role"><option value="seller">Seller · getting paid</option><option value="buyer">Buyer · paying</option><option value="unspecified">Unspecified</option></select></div>
             <div><label for="dg_discount" id="dg_discount_label">Maximum discount (%)</label><input type="number" id="dg_discount" min="0" max="100" value="10"></div>
@@ -929,7 +929,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 <input id="user_goal" value="Close annual compute supply agreement under $1.2M total budget; legal sign-off by Friday." />
             </div>
             <div>
-                <label id="lbl_bottom_line">🛑 Hard Bottom Lines (Nash Threat Points / BATNA):</label>
+                <label id="lbl_bottom_line">📝 Other deal notes (not machine-enforced):</label>
                 <input id="hard_bottom_line" value="Seller: payment within 45 days; max discount 10%; no exclusivity." />
             </div>
         </div>
@@ -977,7 +977,7 @@ HTML_UI = r"""<!DOCTYPE html>
         <textarea id="input_text" rows="3"></textarea>
 
         <div class="btn-row">
-            <button type="button" id="mic_btn" class="mic-btn" onclick="toggleMic()">🎤 开启降噪语音捕获 (对手发言时点击)</button>
+            <button type="button" id="mic_btn" class="mic-btn" onclick="toggleMic()">🎤 启动语音转写（须征得同意）</button>
             <button type="button" id="run_btn" class="primary" onclick="runAgent()">⚡ Execute Game-Theoretic Engine</button>
         </div>
     </div>
@@ -1106,7 +1106,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 hero: 'A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.',
                 chip1:'✓ Explicit rule checks', chip2:'✓ Evidence, not guesswork', chip3:'✓ Unknown ≠ Safe',
                 panel:'01 / Independent deal audit', label:'NO GEMINI CALL REQUIRED',
-                desc:'Uses your Hard Bottom Lines and the proposal text below. Detects explicit discount, payment-window, and exclusivity rule conflicts. The rules are inspectable and conservative.',
+                desc:'Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.',
                 check:'◆ Check deal constraints', demo:'Load 3-rule stress test', pending:'Checking…',
                 notyet:'NOT YET CHECKED', violation:'RULE VIOLATION', unknown:'NEEDS VERIFICATION',
                 pass:'NO DETECTED VIOLATION', checks:'checks', failures:'violations',
@@ -1132,7 +1132,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 hero:'面向初创公司创始人的可审计交易承诺防火墙。先用独立规则引擎检查交易条件，再让 Consigliere AI 提供谈判策略。',
                 chip1:'✓ 明确规则校验',chip2:'✓ 可核查证据',chip3:'✓ 未知不等于安全',
                 panel:'01 / 独立交易底线审计',label:'不调用 GEMINI · 无需模型配额',
-                desc:'读取下方的「绝对底线」与「当前阶段输入」，检查明确的折扣、付款期限和独家条款冲突。未知情况不会伪装成安全。',
+                desc:'使用下方结构化规则与交易文本进行检查；自由文本仅作背景。不能识别的条件会提示人工核查。',
                 check:'◆ 立即检查交易底线',demo:'加载 3 项违规演示',pending:'审计中…',
                 notyet:'尚未检查',violation:'发现底线违规',unknown:'需要进一步核实',
                 pass:'未发现规则冲突',checks:'项检查',failures:'项违规',
@@ -1332,7 +1332,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('subtitle_text').innerText = "明确底线 · 审计交易条款 · 选择谈判方案";
                 document.getElementById('sec1_title').innerText = "📂 1. 商业目标与决策偏好";
                 document.getElementById('lbl_goal').innerText = "🎯 核心目标、预算与时间线：";
-                document.getElementById('lbl_bottom_line').innerText = "🛑 绝对底线 (纳什谈判威胁点 / BATNA)：";
+                document.getElementById('lbl_bottom_line').innerText = "📝 其他交易备注（不自动作为硬规则）：";
                 document.getElementById('lbl_risk').innerText = "🧠 自行填写的决策偏好与提醒：";
                 document.getElementById('sec2_title').innerText = "🛡️ 2. 三阶段交易决策辅助";
                 document.getElementById('tab1_t').innerText = "🕒 阶段1：战前15分钟预警";
@@ -1342,12 +1342,12 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('tab3_t').innerText = "🎙️ 阶段3：战后60秒复盘";
                 document.getElementById('tab3_d').innerText = "口述得失审计、口头让步找补与跟进邮件";
                 document.getElementById('lbl_mode').innerText = "浏览器语音转写（依赖设备及浏览器）：";
-                document.getElementById('opt_lang_en').innerText = "🎙️ 麦克风通道：English (US / Global) + Hardware Noise Suppression";
+                document.getElementById('opt_lang_en').innerText = "🎙️ 麦克风通道：English (US / Global) + Browser-dependent transcription";
                 document.getElementById('opt_lang_zh').innerText = "🎙️ 中文语音转写（依赖浏览器）";
                 document.getElementById('lbl_input_text').innerText = "当前阶段输入（战前对手背景 / 战中对手发言转写或纪要 / 战后60秒语音口述）：";
-                document.getElementById('mic_btn').innerText = "🎤 开启降噪语音捕获 (对手发言时点击)";
+                document.getElementById('mic_btn').innerText = "🎤 启动语音转写（须征得同意）";
                 document.getElementById('run_btn').innerText = "⚡ 启动全周期博弈推演";
-                document.getElementById('btn_copy_q').innerText = "📋 复制破局反问/短信";
+                document.getElementById('btn_copy_q').innerText = "📋 复制反问/提醒草稿";
                 document.getElementById('btn_copy_draft').innerText = "📋 复制全文/跟进邮件";
                 document.getElementById('btn_mail_client').innerText = "✉️ 唤起本地邮件客户端";
 
@@ -1357,7 +1357,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('subtitle_text').innerText = "Set limits · Verify terms · Explore options";
                 document.getElementById('sec1_title').innerText = "📂 1. Commercial goals and decision preferences";
                 document.getElementById('lbl_goal').innerText = "🎯 Core Goal, Budget & Timeline:";
-                document.getElementById('lbl_bottom_line').innerText = "🛑 Hard Bottom Lines (Nash Threat Points / BATNA):";
+                document.getElementById('lbl_bottom_line').innerText = "📝 Other deal notes (not machine-enforced):";
                 document.getElementById('lbl_risk').innerText = "🧠 User-entered decision preferences and reminders:";
                 document.getElementById('sec2_title').innerText = "🛡️ 2. Three-stage decision support";
                 document.getElementById('tab1_t').innerText = "🕒 Stage 1: T-15m Pre-Deal";
@@ -1370,7 +1370,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('opt_lang_en').innerText = "🎙️ English transcription (browser-dependent)";
                 document.getElementById('opt_lang_zh').innerText = "🎙️ 中文语音转写（依赖浏览器）";
                 document.getElementById('lbl_input_text').innerText = "Stage Input (Meeting Context / Live Opponent Speech / 60s Post-Deal Voice Memo):";
-                document.getElementById('mic_btn').innerText = "🎤 Start Noise-Suppressed Capture";
+                document.getElementById('mic_btn').innerText = "🎤 Start speech transcription (consent required)";
                 document.getElementById('run_btn').innerText = "⚡ Execute Game-Theoretic Engine";
                 document.getElementById('btn_copy_q').innerText = "📋 Copy Alert";
                 document.getElementById('btn_copy_draft').innerText = "📋 Copy Full Draft / Email";
@@ -1399,9 +1399,9 @@ HTML_UI = r"""<!DOCTYPE html>
             } else if (currentPhase === 'in_deal') {
                 container.innerHTML = currentLang === 'zh'
                     ? `<button type="button" class="preset-btn" onclick="loadPreset('trap')">🔥 战中案例 1：高危复合陷阱（压价25%+排他+假死线）</button>
-                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ 战中案例 2：良性对齐沟通（验证零误报）</button>`
+                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ 战中案例 2：良性对齐沟通（正常交易基线）</button>`
                     : `<button type="button" class="preset-btn" onclick="loadPreset('trap')">🔥 Live Case 1: Ultimatum Trap (25% Cut + Exclusivity)</button>
-                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ Live Case 2: Benign Alignment (Zero False Alarm)</button>`;
+                       <button type="button" class="preset-btn" onclick="loadPreset('safe')">✅ Live Case 2: Benign Alignment (Benign Baseline)</button>`;
             } else {
                 container.innerHTML = currentLang === 'zh'
                     ? `<button type="button" class="preset-btn" onclick="loadPreset('slippage')">🚨 战后案例 1：现场口头松口越界（急需邮件附加条件找补）</button>
@@ -1522,7 +1522,7 @@ HTML_UI = r"""<!DOCTYPE html>
             isListening = false;
             const micBtn = document.getElementById('mic_btn');
             micBtn.className = 'mic-btn';
-            micBtn.innerText = currentLang === 'zh' ? "🎤 开启降噪语音捕获 (对手发言时点击)" : "🎤 Start Noise-Suppressed Capture";
+            micBtn.innerText = currentLang === 'zh' ? "🎤 启动语音转写（须征得同意）" : "🎤 Start speech transcription (consent required)";
         }
 
         async function runAgent() {
@@ -1675,7 +1675,7 @@ HTML_UI = r"""<!DOCTYPE html>
         function copyCounterQuestion() {
             if (!latestTacticalOutput || !latestTacticalOutput.counter_question) return;
             navigator.clipboard.writeText(latestTacticalOutput.counter_question).then(() => {
-                showToast(currentLang === 'zh' ? '✅ 破局反问/短信已复制！' : '✅ Alert copied!');
+                showToast(currentLang === 'zh' ? '✅ 反问或提醒草稿已复制！' : '✅ Alert copied!');
             });
         }
 
