@@ -1,0 +1,84 @@
+name: Frozen Holdout + Prior Challenge Gemini Comparison
+on:
+  push:
+    branches:
+      - experiment/frozen-holdout-v1-20261102
+    paths:
+      - '.github/workflows/frozen-holdout-comparison.yml'
+permissions:
+  contents: read
+jobs:
+  paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: gemini-3.5-flash-lite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Freeze manifest and validate scripts and existing regression tests
+        run: |
+          python -m py_compile dealguard.py research/run_gemini_baseline.py research/evaluate.py research/paired_compare.py
+          python -m unittest discover -s tests -v
+          echo "Frozen file checksums:"
+          sha256sum research/frozen_holdout_v1.json research/challenge_cases.json dealguard.py research/run_gemini_baseline.py
+      - name: Validate private Gemini authorization without printing the key
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::No Gemini key configured; experiment not run."
+            exit 1
+          fi
+          echo "API key available (value not displayed)."
+      - name: Gemini on 40 new frozen cases, no result-dependent code changes
+        run: |
+          python research/run_gemini_baseline.py --cases research/frozen_holdout_v1.json --limit 40 --sleep 2 --output research/holdout_v1_gemini_predictions.json
+          python - <<'PY'
+          import json
+          cases=json.load(open('research/frozen_holdout_v1.json',encoding='utf-8'))['cases']
+          pred=json.load(open('research/holdout_v1_gemini_predictions.json',encoding='utf-8'))
+          if len(pred)!=40 or {p['id'] for p in pred}!={c['id'] for c in cases}:
+              raise SystemExit('Incomplete 40-case Gemini holdout predictions; no valid aggregate report.')
+          print('Verified 40/40 unique Gemini holdout predictions.')
+          PY
+      - name: Score 40 cases with symmetric paired comparison and detailed failures
+        run: |
+          python research/paired_compare.py --cases research/frozen_holdout_v1.json --predictions research/holdout_v1_gemini_predictions.json --output-prefix research/holdout_v1_paired
+          python research/evaluate.py --cases research/frozen_holdout_v1.json --baseline-predictions research/holdout_v1_gemini_predictions.json --output research/holdout_v1_gemini_metrics.md --json research/holdout_v1_gemini_metrics.json
+          python research/evaluate.py --cases research/frozen_holdout_v1.json --output research/holdout_v1_dealguard_metrics.md --json research/holdout_v1_dealguard_metrics.json
+      - name: Upload new 40-case holdout evidence, even if later challenge fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-frozen-holdout-40-results
+          path: |
+            research/holdout_v1_*.json
+            research/holdout_v1_*.md
+            research/holdout_v1_*.csv
+          retention-days: 30
+      - name: Gemini on the previously known 20-case challenge set (separate score)
+        run: |
+          python research/run_gemini_baseline.py --cases research/challenge_cases.json --limit 20 --sleep 2 --output research/prior_challenge_gemini_predictions.json
+          python - <<'PY'
+          import json
+          cases=json.load(open('research/challenge_cases.json',encoding='utf-8'))['cases']
+          pred=json.load(open('research/prior_challenge_gemini_predictions.json',encoding='utf-8'))
+          if len(pred)!=20 or {p['id'] for p in pred}!={c['id'] for c in cases}:
+              raise SystemExit('Incomplete 20-case Gemini challenge predictions.')
+          print('Verified 20/20 unique Gemini challenge predictions.')
+          PY
+      - name: Evaluate prior 20-case challenge as a separate comparison
+        run: |
+          python research/paired_compare.py --cases research/challenge_cases.json --predictions research/prior_challenge_gemini_predictions.json --output-prefix research/prior_challenge_paired
+          python research/evaluate.py --cases research/challenge_cases.json --baseline-predictions research/prior_challenge_gemini_predictions.json --output research/prior_challenge_gemini_metrics.md --json research/prior_challenge_gemini_metrics.json
+          python research/evaluate.py --cases research/challenge_cases.json --output research/prior_challenge_dealguard_metrics.md --json research/prior_challenge_dealguard_metrics.json
+      - name: Upload prior challenge evidence separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: prior-known-challenge-20-results
+          path: |
+            research/prior_challenge_*.json
+            research/prior_challenge_*.md
+            research/prior_challenge_*.csv
+          retention-days: 30
