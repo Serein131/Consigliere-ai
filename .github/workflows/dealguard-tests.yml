@@ -2,7 +2,7 @@ name: DealGuard Regression
 on:
   pull_request:
   push:
-    branches: [feature/dealguard-constraint-engine]
+    branches: [feature/dealguard-constraint-engine, feature/dealguard-visible-dashboard]
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
