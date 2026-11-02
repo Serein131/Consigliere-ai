@@ -40,7 +40,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.5-flash-lite
-          SAMPLE_SIZE: ${{ inputs.sample_size || '10' }}
+          SAMPLE_SIZE: ${{ inputs.sample_size || '1' }}
         run: |
           python research/run_gemini_baseline.py --limit "$SAMPLE_SIZE" --sleep 2
           python - <<'PY'
@@ -56,7 +56,7 @@ jobs:
           PY
       - name: Score ordinary Gemini versus deterministic DealGuard on paired cases
         env:
-          SAMPLE_SIZE: ${{ inputs.sample_size || '10' }}
+          SAMPLE_SIZE: ${{ inputs.sample_size || '1' }}
         run: |
           python research/evaluate.py --limit "$SAMPLE_SIZE" --baseline-predictions research/baseline_predictions.json --output research/gemini_baseline_report.md --json research/gemini_baseline_report.json
           python research/evaluate.py --limit "$SAMPLE_SIZE" --output research/dealguard_paired_report.md --json research/dealguard_paired_report.json

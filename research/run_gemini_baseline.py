@@ -84,9 +84,21 @@ def main():
             continue
         try:
             result=classify(case,api_key,model)
-        except (urllib.error.HTTPError,urllib.error.URLError,ValueError,KeyError,IndexError,TimeoutError) as ex:
-            # Do not silently turn failed API requests into apparent model errors.
-            print(f"{case['id']}: request failed ({type(ex).__name__}); stop and resume later")
+        except urllib.error.HTTPError as ex:
+            # Only report response code and status identifier; never print a raw
+            # Google error message, API key, request headers, or response body.
+            try:
+                error_status = json.loads(ex.read(4096).decode("utf-8")).get("error",{}).get("status","UNKNOWN")
+                if error_status not in ("INVALID_ARGUMENT","FAILED_PRECONDITION","UNAUTHENTICATED",
+                                        "PERMISSION_DENIED","NOT_FOUND","RESOURCE_EXHAUSTED",
+                                        "UNAVAILABLE","INTERNAL","UNKNOWN"):
+                    error_status="OTHER"
+            except (ValueError,UnicodeError,AttributeError):
+                error_status="UNKNOWN"
+            print(f"{case['id']}: Gemini HTTP {ex.code}, status={error_status}. No prediction saved.")
+            break
+        except (urllib.error.URLError,ValueError,KeyError,IndexError,TimeoutError) as ex:
+            print(f"{case['id']}: request failed ({type(ex).__name__}); no prediction saved.")
             break
         done[case["id"]]=result
         output.parent.mkdir(parents=True,exist_ok=True)
