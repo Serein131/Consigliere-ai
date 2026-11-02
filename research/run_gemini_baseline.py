@@ -62,18 +62,25 @@ def classify(case, key, model):
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--limit",type=int,default=10,
-                    help="Number of cases; start small to control cost (max 60)")
+                    help="Number of cases to run; start small to control cost")
+    ap.add_argument("--cases",default=str(ROOT/"research"/"synthetic_cases.json"),
+                    help="JSON dataset with a cases array")
     ap.add_argument("--sleep",type=float,default=2.0,
                     help="Delay between requests to avoid rate limits")
     ap.add_argument("--output",default=str(ROOT/"research"/"baseline_predictions.json"))
     args=ap.parse_args()
-    if not (1<=args.limit<=60):
-        ap.error("--limit must be 1..60")
+    source=json.loads(pathlib.Path(args.cases).read_text(encoding="utf-8"))
+    if not isinstance(source,dict) or not isinstance(source.get("cases"),list):
+        ap.error("--cases must contain a list of test cases")
+    if not (1<=args.limit<=len(source["cases"])):
+        ap.error("--limit must be 1..dataset case count")
     api_key=(os.environ.get("GEMINI_API_KEY") or "").strip()
     if not api_key:
         ap.error("Set GEMINI_API_KEY in your local environment; do NOT paste it into GitHub")
     model=os.environ.get("GEMINI_MODEL","gemini-3.5-flash-lite").strip()
-    cases=json.loads((ROOT/"research"/"synthetic_cases.json").read_text(encoding="utf-8"))["cases"][:args.limit]
+    cases=source["cases"][:args.limit]
+    if len({case["id"] for case in cases})!=len(cases):
+        ap.error("Dataset has duplicate case IDs")
     done={}
     output=pathlib.Path(args.output)
     if output.exists():
@@ -82,28 +89,38 @@ def main():
     for case in cases:
         if case["id"] in done:
             continue
-        try:
-            result=classify(case,api_key,model)
-        except urllib.error.HTTPError as ex:
-            # Only report response code and status identifier; never print a raw
-            # Google error message, API key, request headers, or response body.
+        result=None
+        for attempt in range(5):
             try:
-                error_status = json.loads(ex.read(4096).decode("utf-8")).get("error",{}).get("status","UNKNOWN")
-                if error_status not in ("INVALID_ARGUMENT","FAILED_PRECONDITION","UNAUTHENTICATED",
-                                        "PERMISSION_DENIED","NOT_FOUND","RESOURCE_EXHAUSTED",
-                                        "UNAVAILABLE","INTERNAL","UNKNOWN"):
-                    error_status="OTHER"
-            except (ValueError,UnicodeError,AttributeError):
-                error_status="UNKNOWN"
-            print(f"{case['id']}: Gemini HTTP {ex.code}, status={error_status}. No prediction saved.")
-            break
-        except (urllib.error.URLError,ValueError,KeyError,IndexError,TimeoutError) as ex:
-            print(f"{case['id']}: request failed ({type(ex).__name__}); no prediction saved.")
+                result=classify(case,api_key,model)
+                break
+            except urllib.error.HTTPError as ex:
+                # Only log HTTP code and stable error status; never the raw response,
+                # request headers, user secrets, or variable API diagnostic strings.
+                try:
+                    error_status=json.loads(ex.read(4096).decode("utf-8")).get("error",{}).get("status","UNKNOWN")
+                    if error_status not in ("INVALID_ARGUMENT","FAILED_PRECONDITION","UNAUTHENTICATED",
+                                            "PERMISSION_DENIED","NOT_FOUND","RESOURCE_EXHAUSTED",
+                                            "UNAVAILABLE","INTERNAL","UNKNOWN"):
+                        error_status="OTHER"
+                except (ValueError,UnicodeError,AttributeError):
+                    error_status="UNKNOWN"
+                if ex.code == 429 and attempt < 4:
+                    delay=min(120,30*(2**attempt))
+                    print(f"{case['id']}: HTTP 429 rate limit; retry {attempt+1}/4 after {delay}s.",flush=True)
+                    time.sleep(delay)
+                    continue
+                print(f"{case['id']}: Gemini HTTP {ex.code}, status={error_status}. Stopping with partial results.",flush=True)
+                break
+            except (urllib.error.URLError,ValueError,KeyError,IndexError,TimeoutError) as ex:
+                print(f"{case['id']}: request failed ({type(ex).__name__}); stopping with partial results.",flush=True)
+                break
+        if result is None:
             break
         done[case["id"]]=result
         output.parent.mkdir(parents=True,exist_ok=True)
         output.write_text(json.dumps(list(done.values()),ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-        print(f"{case['id']}: saved; {len(done)}/{args.limit}")
+        print(f"{case['id']}: saved; {len(done)}/{args.limit}",flush=True)
         time.sleep(max(0,args.sleep))
     print("Predictions stored locally, no raw API key written.")
     print("Next: python research/evaluate.py --baseline-predictions "+str(output))

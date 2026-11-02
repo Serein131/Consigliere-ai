@@ -1,5 +1,8 @@
 # Consigliere AI · Measured Gemini vs. DealGuard experiment
 
+> **Important later validation (same date):** A newly frozen 40-case synthetic holdout *reversed* the direction of the standard benchmark: Gemini 31/40 vs. DealGuard 16/40 exact authored-label matches. On a separate previously inspected 20-case challenge suite, Gemini 13/20 vs. DealGuard 3/20. [See the latest frozen holdout results](HOLDOUT_RESULTS_2026-11-02.md) before interpreting the familiar 60-case regression results below.
+
+
 **Experiment date:** 2026-11-02
 
 **Important:** This is a comparison on **60 developer-authored synthetic negotiation cases**, not independent legal review, real customer deals, or a claim of production accuracy. DealGuard was previously improved using this very same standard suite. The dataset is **not a clean holdout**. Some expected labels may reasonably be disputed.
