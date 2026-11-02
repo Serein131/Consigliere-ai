@@ -969,6 +969,17 @@ HTML_UI = r"""<!DOCTYPE html>
     </div>
 
 
+    <section class="dg-hero" aria-label="Founder DealGuard">
+        <div class="dg-kicker" id="dg_kicker">CONSIGLIERE AI · DECISION INTELLIGENCE</div>
+        <h1 id="dg_headline">Prepare. Protect. Debrief.</h1>
+        <p class="dg-subtitle" id="dg_hero_desc">One decision context for preparing your position, checking live deal terms and closing the loop after a meeting.</p>
+        <div class="dg-chips">
+            <span class="dg-chip" id="dg_chip1">✓ Explicit rule checks</span>
+            <span class="dg-chip" id="dg_chip2">✓ Evidence, not guesswork</span>
+            <span class="dg-chip" id="dg_chip3">✓ Unknown ≠ Safe</span>
+        </div>
+    </section>
+
     <!-- One navigation: Prepare → Protect → Debrief. No second numbered journey. -->
     <nav class="card workflow-navigation" aria-label="Negotiation workflow">
         <h2 class="card-title" id="sec2_title">Your three-stage decision workspace</h2>
@@ -1246,9 +1257,9 @@ HTML_UI = r"""<!DOCTYPE html>
         // DealGuard v5: direct, model-independent rule audit; all displayed results use textContent.
         const DG_LABELS = {
             en: {
-                kicker: 'FOUNDER DEALGUARD · DECISION INTELLIGENCE',
-                headline: 'Know your red lines before you make a deal.',
-                hero: 'A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.',
+                kicker: 'CONSIGLIERE AI · DECISION INTELLIGENCE',
+                headline: 'Prepare. Protect. Debrief.',
+                hero: 'One context to prepare your limits, check live deal terms and follow through after a negotiation.',
                 chip1:'✓ Explicit rule checks', chip2:'✓ Evidence, not guesswork', chip3:'✓ Unknown ≠ Safe',
                 panel:'Your deal guardrails', label:'SHARED ACROSS ALL STAGES',
                 desc:'Set commercial thresholds once. They carry into Protect and Debrief. Notes are context, not enforced rules.',
@@ -1291,9 +1302,9 @@ HTML_UI = r"""<!DOCTYPE html>
                 copilot:'Continue with an optional tactical response ↑'
             },
             zh: {
-                kicker:'FOUNDER DEALGUARD · 创始人交易决策系统',
-                headline:'签约之前，先守住你的交易底线。',
-                hero:'先设定交易底线，再核对 Gemini 提取的原文与程序审计结果；无法确认的条款需要人工复核。',
+                kicker:'CONSIGLIERE AI · 创始人谈判决策助手',
+                headline:'谈判前准备 · 谈判中守护 · 谈判后复盘',
+                hero:'一次设定交易底线，战中核查证据，战后整理承诺与跟进事项。每次分析都由你主动触发。',
                 chip1:'✓ 明确规则校验',chip2:'✓ 可核查证据',chip3:'✓ 未知不等于安全',
                 panel:'本次交易底线',label:'三阶段共同使用',
                 desc:'只需设置一次明确底线，谈判中与谈判后沿用；备注只作背景，不是机器强制规则。',
