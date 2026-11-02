@@ -56,7 +56,7 @@ jobs:
           PY
       - name: Score ordinary Gemini versus deterministic DealGuard on paired cases
         env:
-          SAMPLE_SIZE: ${{ inputs.sample_size }}
+          SAMPLE_SIZE: ${{ inputs.sample_size || '10' }}
         run: |
           python research/evaluate.py --limit "$SAMPLE_SIZE" --baseline-predictions research/baseline_predictions.json --output research/gemini_baseline_report.md --json research/gemini_baseline_report.json
           python research/evaluate.py --limit "$SAMPLE_SIZE" --output research/dealguard_paired_report.md --json research/dealguard_paired_report.json
