@@ -36,7 +36,14 @@ jobs:
             exit 1
           fi
           echo "Gemini API authentication configured. No key value is printed."
+      - name: Minimal Gemini API diagnostic (push-triggered only)
+        if: github.event_name == 'push'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.5-flash-lite
+        run: python research/diagnose_gemini.py
       - name: Run real Gemini-only baseline (quota or charges may apply)
+        if: github.event_name == 'workflow_dispatch'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.5-flash-lite
@@ -55,13 +62,14 @@ jobs:
           print(f"Gemini predicted all {observed} synthetic cases.")
           PY
       - name: Score ordinary Gemini versus deterministic DealGuard on paired cases
+        if: github.event_name == 'workflow_dispatch'
         env:
           SAMPLE_SIZE: ${{ inputs.sample_size || '1' }}
         run: |
           python research/evaluate.py --limit "$SAMPLE_SIZE" --baseline-predictions research/baseline_predictions.json --output research/gemini_baseline_report.md --json research/gemini_baseline_report.json
           python research/evaluate.py --limit "$SAMPLE_SIZE" --output research/dealguard_paired_report.md --json research/dealguard_paired_report.json
       - name: Upload real model predictions and paired reports
-        if: success()
+        if: github.event_name == 'workflow_dispatch' && success()
         uses: actions/upload-artifact@v4
         with:
           name: measured-gemini-vs-dealguard
