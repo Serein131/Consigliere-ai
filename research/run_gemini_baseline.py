@@ -69,7 +69,7 @@ def main():
     args=ap.parse_args()
     if not (1<=args.limit<=60):
         ap.error("--limit must be 1..60")
-    api_key=os.environ.get("GEMINI_API_KEY")
+    api_key=(os.environ.get("GEMINI_API_KEY") or "").strip()
     if not api_key:
         ap.error("Set GEMINI_API_KEY in your local environment; do NOT paste it into GitHub")
     model=os.environ.get("GEMINI_MODEL","gemini-3.5-flash-lite").strip()
