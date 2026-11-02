@@ -6,6 +6,7 @@ import logging
 import http.client
 from flask import Flask, request, jsonify, render_template_string
 from dealguard import check_deal
+from hybrid_service import execute_hybrid, HybridError, MAX_PROPOSAL_CHARS, MAX_REQUEST_BYTES
 
 app = Flask(__name__)
 
@@ -110,6 +111,40 @@ def audit_only():
         server_fallback_redact(rules)["sanitized_text"],
         payload.get("structured_rules")
     ))
+
+@app.route("/hybrid-audit", methods=["POST"])
+def hybrid_audit():
+    """Opt-in Gemini term extraction + deterministic evidence-grounded audit."""
+    if request.content_length and request.content_length > MAX_REQUEST_BYTES:
+        return jsonify({"error": "REQUEST_TOO_LARGE"}), 413
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "INVALID_JSON"}), 400
+    if payload.get("consent_to_model_processing") is not True:
+        return jsonify({"error": "MODEL_CONSENT_REQUIRED"}), 400
+    proposal = payload.get("text")
+    if not isinstance(proposal, str) or not proposal.strip():
+        return jsonify({"error": "EMPTY_PROPOSAL"}), 400
+    if len(proposal) > MAX_PROPOSAL_CHARS:
+        return jsonify({"error": "PROPOSAL_TOO_LONG"}), 413
+    # Both client and server perform only best-effort regex redaction.
+    # Financial terms, discount rates and payment days remain analyzable.
+    redacted = server_fallback_redact(proposal)
+    try:
+        output = execute_hybrid(
+            redacted["sanitized_text"],
+            payload.get("structured_rules"),
+            os.environ.get("GEMINI_API_KEY", ""),
+            model=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+        )
+    except HybridError as exc:
+        return jsonify({"error": exc.code}), exc.status_code
+    output["redacted_items_count"] = redacted["redaction_count"]
+    response = jsonify(output)
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
 
 @app.route("/analyze", methods=["POST"])
 def analyze_negotiation():
@@ -319,7 +354,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v5.1 | Founder DealGuard — Auditable Decision Intelligence</title>
+    <title>Consigliere AI v5.2 | Founder DealGuard — Evidence-First Audit</title>
     <style>
         :root {
             --bg-canvas: #f8fafc;
@@ -868,7 +903,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <body>
     <div class="header-row">
         <div>
-            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.1 · Founder DealGuard</span></div>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.2 · Founder DealGuard</span></div>
             <div class="subtitle" id="subtitle_text">Set limits · Verify terms · Explore options</div>
         </div>
         <div class="lang-switch">
