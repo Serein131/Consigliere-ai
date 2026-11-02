@@ -34,7 +34,7 @@ jobs:
           echo "API key available (value not displayed)."
       - name: Gemini on 40 new frozen cases, no result-dependent code changes
         run: |
-          python research/run_gemini_baseline.py --cases research/frozen_holdout_v1.json --limit 40 --sleep 2 --output research/holdout_v1_gemini_predictions.json
+          python research/run_gemini_baseline.py --cases research/frozen_holdout_v1.json --limit 40 --sleep 6 --output research/holdout_v1_gemini_predictions.json
           python - <<'PY'
           import json
           cases=json.load(open('research/frozen_holdout_v1.json',encoding='utf-8'))['cases']
@@ -43,6 +43,14 @@ jobs:
               raise SystemExit('Incomplete 40-case Gemini holdout predictions; no valid aggregate report.')
           print('Verified 40/40 unique Gemini holdout predictions.')
           PY
+      - name: Preserve completed holdout predictions even if API rate-limits
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: holdout-attempt-predictions
+          path: research/holdout_v1_gemini_predictions.json
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Score 40 cases with symmetric paired comparison and detailed failures
         run: |
           python research/paired_compare.py --cases research/frozen_holdout_v1.json --predictions research/holdout_v1_gemini_predictions.json --output-prefix research/holdout_v1_paired
@@ -59,7 +67,7 @@ jobs:
           retention-days: 30
       - name: Gemini on the previously known 20-case challenge set (separate score)
         run: |
-          python research/run_gemini_baseline.py --cases research/challenge_cases.json --limit 20 --sleep 2 --output research/prior_challenge_gemini_predictions.json
+          python research/run_gemini_baseline.py --cases research/challenge_cases.json --limit 20 --sleep 6 --output research/prior_challenge_gemini_predictions.json
           python - <<'PY'
           import json
           cases=json.load(open('research/challenge_cases.json',encoding='utf-8'))['cases']
@@ -68,6 +76,14 @@ jobs:
               raise SystemExit('Incomplete 20-case Gemini challenge predictions.')
           print('Verified 20/20 unique Gemini challenge predictions.')
           PY
+      - name: Preserve any completed challenge predictions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: challenge-attempt-predictions
+          path: research/prior_challenge_gemini_predictions.json
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Evaluate prior 20-case challenge as a separate comparison
         run: |
           python research/paired_compare.py --cases research/challenge_cases.json --predictions research/prior_challenge_gemini_predictions.json --output-prefix research/prior_challenge_paired
