@@ -1469,6 +1469,7 @@ HTML_UI = r"""<!DOCTYPE html>
         }
         async function runDealAudit(mode) {
             if(dgRequestInFlight)return;
+            if(isListening)stopMicInternal();
             const l=DG_LABELS[currentLang];
             const output=document.getElementById('dg_output'),status=document.getElementById('dg_status');
             output.style.display='block';
@@ -1776,110 +1777,128 @@ HTML_UI = r"""<!DOCTYPE html>
             };
         }
 
-        let recognition = null;
-        let isListening = false;
+        let recognition=null;
+        let isListening=false;
+        let speechBaseText='';
+        let micStartPhase=null;
 
-        // 彻底修复长语音转写：从第 0 个分块开始全量拼接，杜绝覆盖前半截文本
+        function updateMicUI(message) {
+            const btn=document.getElementById('mic_btn');
+            const status=document.getElementById('mic_status');
+            const zh=currentLang==='zh';
+            btn.classList.toggle('active',isListening);
+            btn.textContent=isListening?(zh?'■ 停止语音转写':'■ Stop transcription')
+                :(zh?'🎙️ 开始语音转写':'🎙️ Start transcription');
+            status.textContent=message || (isListening
+                ?(zh?'麦克风已开启 · 只转写，不自动分析':'Microphone on · text only, no auto-analysis')
+                :(zh?'麦克风已关闭 · 请主动点击分析':'Microphone off · press Analyze when ready'));
+        }
+
         async function toggleMic() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                alert(currentLang === 'zh' ? "浏览器不支持 Web Speech API，请使用 Chrome/Safari 或点击上方预设案例。" : "Browser does not support Web Speech API.");
+            if(isListening){
+                stopMicInternal();
                 return;
             }
-
-            if (!isListening) {
-                // 1. 先清空输入框并重置识别器
-                document.getElementById('input_text').value = "";
-                
-                // 2. 激活声卡硬件降噪
-                try {
-                    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                        audioStream = await navigator.mediaDevices.getUserMedia({
-                            audio: {
-                                noiseSuppression: true,
-                                echoCancellation: true,
-                                autoGainControl: true
-                            }
-                        });
+            const zh=currentLang==='zh';
+            if(!document.getElementById('mic_consent').checked){
+                updateMicUI(zh?'请先确认已获得适当的转写许可':'Confirm the applicable recording/transcription permission first');
+                return;
+            }
+            const SpeechRecognition=window.SpeechRecognition || window.webkitSpeechRecognition;
+            if(!SpeechRecognition){
+                updateMicUI(zh?'此浏览器不支持语音识别，请手动输入':'Speech recognition unavailable; please type instead');
+                return;
+            }
+            // Preserve manually typed text when starting a user-controlled transcript.
+            const editor=document.getElementById('input_text');
+            const previous=editor.value.trim();
+            speechBaseText=previous?(previous+'\n'):'';
+            micStartPhase=currentPhase;
+            try{
+                recognition=new SpeechRecognition();
+                recognition.lang=document.getElementById('voice_lang').value;
+                recognition.continuous=true;
+                recognition.interimResults=true;
+                recognition.onresult=(event)=>{
+                    if(!isListening || currentPhase!==micStartPhase)return;
+                    const parts=[];
+                    for(let i=0;i<event.results.length;i++){
+                        if(event.results[i] && event.results[i][0])
+                            parts.push(event.results[i][0].transcript);
                     }
-                } catch (e) {
-                    console.log("Audio constraints bypassed:", e);
-                }
-
-                if (!recognition) {
-                    recognition = new SpeechRecognition();
-                    recognition.continuous = true;
-                    recognition.interimResults = true;
-
-                    // 关键修复：从 i = 0 全量累加所有分块，绝对不再漏掉前面的句子！
-                    recognition.onresult = (event) => {
-                        let fullTranscript = '';
-                        for (let i = 0; i < event.results.length; ++i) {
-                            fullTranscript += event.results[i][0].transcript;
-                        }
-                        document.getElementById('input_text').value = fullTranscript;
-
-                        // 智能停顿探测：4.5秒自然停顿后自动分析
-                        if (silenceTimer) clearTimeout(silenceTimer);
-                        silenceTimer = setTimeout(() => {
-                            if (isListening && document.getElementById('input_text').value.trim().length >= 6) {
-                                stopMicInternal();
-                                runAgent();
-                            }
-                        }, 4500);
-                    };
-
-                    recognition.onend = () => {
+                    const transcript=parts.join(' ').trim();
+                    editor.value=(speechBaseText+transcript).slice(0,3500);
+                    stageDrafts[currentPhase]=editor.value;
+                    updateDealCharCount();
+                    invalidateDealAudit();
+                };
+                recognition.onerror=(event)=>{
+                    const kind=event && event.error;
+                    stopMicInternal();
+                    updateMicUI(kind==='not-allowed'||kind==='service-not-allowed'
+                        ?(zh?'麦克风未获授权，请检查浏览器权限':'Microphone permission denied; check browser settings')
+                        :(zh?'语音识别已中断，可手动继续输入':'Transcription interrupted; you can keep typing'));
+                };
+                recognition.onend=()=>{
+                    if(isListening){
                         stopMicInternal();
-                        const now = Date.now();
-                        if (!isAgentRunning && (now - lastExecutionTimestamp > 2500)) {
-                            const txt = document.getElementById('input_text').value.trim();
-                            if (txt.length >= 4) {
-                                runAgent();
-                            }
-                        }
-                    };
-                }
-
-                recognition.lang = document.getElementById('voice_lang').value;
+                        updateMicUI(zh?'转写已停止；文字已保留，不会自动分析':'Transcription stopped; text saved, no automatic analysis');
+                    }
+                };
                 recognition.start();
-                isListening = true;
-                const micBtn = document.getElementById('mic_btn');
-                micBtn.className = 'mic-btn active';
-                micBtn.innerText = currentLang === 'zh' ? "🛑 正在倾听对方发言 (讲完请点击停止或停顿4.5秒自动分析)" : "🛑 Listening (Click to stop or pause 4.5s)...";
-
-            } else {
+                isListening=true;
+                updateMicUI();
+            }catch(e){
                 stopMicInternal();
-                if (document.getElementById('input_text').value.trim()) {
-                    runAgent();
-                }
+                updateMicUI(zh?'语音识别无法启动，请手动输入':'Speech recognition could not start; type instead');
             }
         }
 
         function stopMicInternal() {
-            if (silenceTimer) clearTimeout(silenceTimer);
-            if (recognition && isListening) {
-                recognition.stop();
+            // Explicit stop, stage switch or browser error never calls /analyze or /hybrid-audit.
+            isListening=false;
+            if(recognition){
+                const previous=recognition;
+                recognition=null;
+                previous.onresult=null;
+                previous.onend=null;
+                previous.onerror=null;
+                try{previous.stop();}catch(e){}
             }
-            if (audioStream) {
-                audioStream.getTracks().forEach(track => track.stop());
-                audioStream = null;
+            if(audioStream){
+                audioStream.getTracks().forEach(track=>track.stop());
+                audioStream=null;
             }
-            isListening = false;
-            const micBtn = document.getElementById('mic_btn');
-            micBtn.className = 'mic-btn';
-            micBtn.innerText = currentLang === 'zh' ? "🎤 启动语音转写（须征得同意）" : "🎤 Start speech transcription (consent required)";
+            if(silenceTimer){
+                clearTimeout(silenceTimer);
+                silenceTimer=null;
+            }
+            micStartPhase=null;
+            updateMicUI();
         }
 
         async function runAgent() {
             if (isAgentRunning) return;
+            if(isListening)stopMicInternal();
+            const requestPhase=currentPhase;
+            const requestSource=document.getElementById('input_text').value;
+            const errBox=document.getElementById('error_box');
+            if(!requestSource.trim()){
+                errBox.style.display='block';
+                errBox.textContent=currentLang==='zh'?'请先填写当前阶段的虚构文本。':'Enter fictional stage notes before requesting AI strategy.';
+                return;
+            }
+            if(!document.getElementById('agent_consent').checked){
+                errBox.style.display='block';
+                errBox.textContent=currentLang==='zh'?'请先确认 AI 策略分析的数据处理说明。':'Confirm the AI strategy processing notice before sending text.';
+                return;
+            }
             const now = Date.now();
             if (now - lastExecutionTimestamp < 1500) {
                 return;
             }
             lastExecutionTimestamp = now;
 
-            const errBox = document.getElementById('error_box');
             const resBox = document.getElementById('result');
             const runBtn = document.getElementById('run_btn');
             errBox.style.display = 'none';
@@ -1930,10 +1949,12 @@ HTML_UI = r"""<!DOCTYPE html>
                 if (!res.ok || data.error) {
                     throw new Error(data.error || `Request failed (HTTP ${res.status})`);
                 }
+                // Do not attach stale strategy to a new phase or changed input.
+                if(currentPhase!==requestPhase || document.getElementById('input_text').value!==requestSource)return;
 
                 const t = data.tactical_advice;
                 latestTacticalOutput = t;
-                sessionMemory[currentPhase] = {
+                sessionMemory[requestPhase] = {
                     trap: t.trap_or_intent,
                     rule: t.triggered_rule,
                     advice: t.counter_question,
@@ -2000,14 +2021,18 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('counter_q').innerText = counterPrefix + '“' + t.counter_question + '”';
                 document.getElementById('draft_box').innerText = draftPrefix + t.draft_reply;
             } catch (err) {
-                errBox.style.display = 'block';
-                errBox.innerText = '⚠️ ' + (err.name === 'AbortError' ? '请求超过 18 秒超时，请稍后重试。' : err.message);
-                resBox.style.display = 'none';
+                if(currentPhase===requestPhase && document.getElementById('input_text').value===requestSource){
+                    errBox.style.display='block';
+                    errBox.textContent='⚠️ '+(err.name==='AbortError'
+                        ?(currentLang==='zh'?'分析超时，请稍后重试。':'Analysis timed out; please retry.')
+                        :err.message);
+                    resBox.style.display='none';
+                }
             } finally {
                 clearTimeout(timeoutId);
                 isAgentRunning = false;
                 runBtn.disabled = false;
-                runBtn.innerText = currentLang === 'zh' ? '⚡ 启动全周期博弈推演' : '⚡ Execute Game-Theoretic Engine';
+                runBtn.textContent=STAGE_COPY[currentLang][currentPhase].action;
             }
         }
 
