@@ -120,6 +120,8 @@ def hybrid_audit():
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"error": "INVALID_JSON"}), 400
+    if os.environ.get("ENABLE_HYBRID_AUDIT", "true").lower() in ("false", "0", "off"):
+        return jsonify({"error": "HYBRID_DISABLED"}), 503
     if payload.get("consent_to_model_processing") is not True:
         return jsonify({"error": "MODEL_CONSENT_REQUIRED"}), 400
     proposal = payload.get("text")
@@ -1227,7 +1229,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 invalidSettings:'Configure at least one valid constraint; check payment direction and thresholds.',
                 tooLong:'Please shorten the proposal to 3,500 characters.',
                 failedInput:'This check could not complete. You can still use Rules-only.',
-                errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini rate limit or quota reached. Use Rules-only.',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini temporarily unavailable. Use Rules-only.',MODEL_NOT_CONFIGURED:'Gemini not configured on this deployment. Rules-only works.',MODEL_FORMAT_ERROR:'Gemini returned unreadable terms. Use Rules-only.',MODEL_CONFIGURATION_ERROR:'Gemini model configuration needs checking. Rules-only works.',MODEL_CONSENT_REQUIRED:'Confirm AI-processing notice first.',PROPOSAL_TOO_LONG:'Proposal too long.',NO_CHECKS_CONFIGURED:'Configure at least one constraint.',INVALID_RULES:'Review the rule thresholds.',REQUEST_TOO_LARGE:'Request too large.'},
+                errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini rate limit or quota reached. Use Rules-only.',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini temporarily unavailable. Use Rules-only.',MODEL_NOT_CONFIGURED:'Gemini not configured on this deployment. Rules-only works.',MODEL_FORMAT_ERROR:'Gemini returned unreadable terms. Use Rules-only.',MODEL_CONFIGURATION_ERROR:'Gemini model configuration needs checking. Rules-only works.',HYBRID_DISABLED:'AI audit is disabled on this deployment. Rules-only still works.',MODEL_CONSENT_REQUIRED:'Confirm AI-processing notice first.',PROPOSAL_TOO_LONG:'Proposal too long.',NO_CHECKS_CONFIGURED:'Configure at least one constraint.',INVALID_RULES:'Review the rule thresholds.',REQUEST_TOO_LARGE:'Request too large.'},
                 copilot:'Use proposal in the three-stage strategy assistant ↓'
             },
             zh: {
@@ -1271,7 +1273,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 invalidSettings:'请设置至少一条有效底线，并检查付款期限规则。',
                 tooLong:'交易文本不得超过3500字。',
                 failedInput:'本次核验未完成，可改用仅规则检测。',
-                errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini 额度或频率受限，可使用仅规则模式。',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini 暂时不可用，可使用仅规则模式。',MODEL_NOT_CONFIGURED:'当前部署尚未配置 Gemini，仍可使用仅规则模式。',MODEL_FORMAT_ERROR:'Gemini 未返回有效的条款，可使用仅规则模式。',MODEL_CONFIGURATION_ERROR:'Gemini 配置需要检查，仍可使用仅规则模式。',MODEL_CONSENT_REQUIRED:'请先同意 AI 文本处理说明。',PROPOSAL_TOO_LONG:'交易文本过长。',NO_CHECKS_CONFIGURED:'请先设定底线。',INVALID_RULES:'请检查底线输入。',REQUEST_TOO_LARGE:'请求内容过长。'},
+                errorCodes:{MODEL_QUOTA_OR_RATE_LIMIT:'Gemini 额度或频率受限，可使用仅规则模式。',MODEL_TEMPORARILY_UNAVAILABLE:'Gemini 暂时不可用，可使用仅规则模式。',MODEL_NOT_CONFIGURED:'当前部署尚未配置 Gemini，仍可使用仅规则模式。',MODEL_FORMAT_ERROR:'Gemini 未返回有效的条款，可使用仅规则模式。',MODEL_CONFIGURATION_ERROR:'Gemini 配置需要检查，仍可使用仅规则模式。',HYBRID_DISABLED:'当前部署已关闭 AI 审计，仍可使用仅规则模式。',MODEL_CONSENT_REQUIRED:'请先同意 AI 文本处理说明。',PROPOSAL_TOO_LONG:'交易文本过长。',NO_CHECKS_CONFIGURED:'请先设定底线。',INVALID_RULES:'请检查底线输入。',REQUEST_TOO_LARGE:'请求内容过长。'},
                 copilot:'将文本带入三阶段谈判助手 ↓'
             }
         };
