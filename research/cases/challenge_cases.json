@@ -1,0 +1,296 @@
+{
+  "dataset_name": "consigliere_dealguard_adversarial_stress_v1",
+  "schema_version": 1,
+  "author": "assistant-created synthetic stress cases, still not independent professional labels",
+  "protocol": "Evaluate as a separate post-fix challenge set; do not tune on it before recording initial result. Some natural language cases may require human adjudication.",
+  "cases": [
+    {
+      "id": "ADV-001",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "Please consider 15% discounted pricing.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Synonymous adjective"
+    },
+    {
+      "id": "ADV-002",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "The customer asks for 15% off the annual fee.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Synonymous off"
+    },
+    {
+      "id": "ADV-003",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "We want a 12% cut in annual fees.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Relative price-cut wording"
+    },
+    {
+      "id": "ADV-004",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "We rejected 15% discount and accepted 8% discount.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Mixed rejection and approval in same clause"
+    },
+    {
+      "id": "ADV-005",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "Discount may be between 8% and 15%.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Range not an actionable single discount"
+    },
+    {
+      "id": "ADV-006",
+      "category": "hard_discount",
+      "language": "zh",
+      "proposal": "客户希望降价十二个百分点。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Spelled-out number"
+    },
+    {
+      "id": "ADV-007",
+      "category": "hard_discount",
+      "language": "zh",
+      "proposal": "将价格降低12%。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Verb synonym"
+    },
+    {
+      "id": "ADV-008",
+      "category": "hard_discount",
+      "language": "zh",
+      "proposal": "我们已经拒绝15%折扣，最后同意8%折扣。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Mixed status in one clause"
+    },
+    {
+      "id": "ADV-009",
+      "category": "hard_payment",
+      "language": "en",
+      "proposal": "Proposed net 90 payment terms.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Net abbreviation"
+    },
+    {
+      "id": "ADV-010",
+      "category": "hard_payment",
+      "language": "en",
+      "proposal": "Customer proposes payment due in 90 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Days after phrase"
+    },
+    {
+      "id": "ADV-011",
+      "category": "hard_payment",
+      "language": "en",
+      "proposal": "We rejected 90-day payment terms and agreed 30 days payment terms.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Final supersedes rejected"
+    },
+    {
+      "id": "ADV-012",
+      "category": "hard_payment",
+      "language": "en",
+      "proposal": "Seller requests payment terms 30 days; buyer insists on payment terms 90 days.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Speaker attribution"
+    },
+    {
+      "id": "ADV-013",
+      "category": "hard_payment",
+      "language": "zh",
+      "proposal": "客户提出三个月后付款。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Chinese number/time unit"
+    },
+    {
+      "id": "ADV-014",
+      "category": "hard_payment",
+      "language": "zh",
+      "proposal": "最初付款期限90天，最终改成30天。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Status of final term"
+    },
+    {
+      "id": "ADV-015",
+      "category": "hard_exclusivity",
+      "language": "en",
+      "proposal": "The exclusivity proposal is under discussion.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Not agreed yet"
+    },
+    {
+      "id": "ADV-016",
+      "category": "hard_exclusivity",
+      "language": "en",
+      "proposal": "We do not require exclusivity now, but may request exclusivity later.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Conditional future possibility"
+    },
+    {
+      "id": "ADV-017",
+      "category": "hard_exclusivity",
+      "language": "en",
+      "proposal": "There is no exclusivity clause, although an annex could add it.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Provisional clause"
+    },
+    {
+      "id": "ADV-018",
+      "category": "hard_exclusivity",
+      "language": "zh",
+      "proposal": "独家合作要求仍在讨论，尚未达成一致。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Unresolved clause"
+    },
+    {
+      "id": "ADV-019",
+      "category": "hard_commercial",
+      "language": "en",
+      "proposal": "The unlimited liability clause was removed from the new draft.",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": "Removed clause should not be a present risk"
+    },
+    {
+      "id": "ADV-020",
+      "category": "hard_commercial",
+      "language": "zh",
+      "proposal": "自动续约条款已经删除。",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": "Deleted renewal term should not be a present risk"
+    }
+  ]
+}

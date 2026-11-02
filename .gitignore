@@ -218,3 +218,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Research: generated API predictions/reports and consented user data
+research/arm_outputs/
+research/four_arm_measured.*
+research/baseline_predictions.json
+research/gemini_baseline_report.*
+research/prior_challenge_gemini_predictions.json
+research/holdout_v1_gemini_predictions.json
+research/private_feedback/
+research/participant_responses/
+research/real_user_feedback*.csv
+research/*_participant_data.*
