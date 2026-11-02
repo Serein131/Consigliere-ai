@@ -1,0 +1,77 @@
+name: Complete GPT Arm Using Preserved Gemini / DealGuard Results
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  gpt-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CASES: research/cases/four_arm_frozen_24.json
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: gpt-6-luna
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate scripts without API requests
+        run: |
+          python -m py_compile research/run_four_arms.py research/evaluate_four_arms.py
+          echo 'Frozen case checksum:'
+          sha256sum "$CASES"
+      - name: Reuse original 24-case A C D model predictions
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 41422998049
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          name: four-arm-measured-and-provider-availability
+          path: research/
+      - name: Verify imported predictions align with frozen case IDs
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          cases=json.loads(Path('research/cases/four_arm_frozen_24.json').read_text())['cases']
+          expected={c['id'] for c in cases}
+          for name in ('gemini','rules','hybrid'):
+              p=Path('research/arm_outputs')/(name+'.json')
+              if not p.is_file(): raise SystemExit('Missing original A/C/D predictions: '+name)
+              data=json.loads(p.read_text())
+              if len(data)!=24 or {x['id'] for x in data}!=expected:
+                  raise SystemExit('Mismatched original predictions: '+name)
+              print('Reused verified 24/24',name,'predictions from prior run.')
+          PY
+      - name: Verify GPT API key exists without exposing its value
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo '::error::OPENAI_API_KEY GitHub secret missing.'
+            exit 1
+          fi
+          echo 'OpenAI key present. GPT requests still require positive API credit and appropriate project limits.'
+      - name: B - Run only the missing GPT 24-case arm
+        run: |
+          python research/run_four_arms.py --cases "$CASES" --arm gpt --sleep 3 --output research/arm_outputs/gpt.json
+      - name: Score all available real arms (no invented results)
+        if: always()
+        run: |
+          if [ -f research/arm_outputs/rules.json ]; then
+            python research/evaluate_four_arms.py --cases "$CASES" --results-dir research/arm_outputs --output-prefix research/four_arm_measured
+          else
+            echo '::warning::Original A/C/D result bundle unavailable, unable to compare all groups.'
+          fi
+      - name: Preserve all actual predictions and four-arm reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpt-only-completion-and-full-comparison
+          path: |
+            research/arm_outputs/*.json
+            research/four_arm_measured.json
+            research/four_arm_measured.md
+            research/four_arm_measured.csv
+          if-no-files-found: warn
+          retention-days: 30
