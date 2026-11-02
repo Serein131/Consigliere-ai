@@ -2,7 +2,7 @@ name: Four-Arm Evidence-Grounded Negotiation Study
 on:
   push:
     branches:
-      - feature/four-arm-research-portfolio-20261102
+      - feature/four-arm-provider-reliability-20261102
     paths:
       - '.github/workflows/four-arm-research.yml'
       - 'research/run_four_arms.py'
@@ -55,11 +55,11 @@ jobs:
       - name: A - Direct Gemini on frozen 24 scenarios
         if: steps.credentials.outputs.gemini == 'true'
         run: |
-          python research/run_four_arms.py --cases "$CASES" --arm gemini --sleep 7 --output research/arm_outputs/gemini.json
+          python research/run_four_arms.py --cases "$CASES" --arm gemini --sleep 6 --output research/arm_outputs/gemini.json
       - name: D - Evidence-grounded Gemini extraction and deterministic audit
         if: always() && steps.credentials.outputs.gemini == 'true' && steps.bootstrap.outcome == 'success'
         run: |
-          python research/run_four_arms.py --cases "$CASES" --arm hybrid --sleep 7 --output research/arm_outputs/hybrid.json
+          python research/run_four_arms.py --cases "$CASES" --arm hybrid --sleep 6 --output research/arm_outputs/hybrid.json
       - name: B - Direct OpenAI GPT on identical rule task
         if: always() && steps.credentials.outputs.openai == 'true' && steps.bootstrap.outcome == 'success'
         run: |
