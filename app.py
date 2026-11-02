@@ -892,6 +892,30 @@ HTML_UI = r"""<!DOCTYPE html>
         .dg-config input[type=checkbox]{width:22px;height:22px}
         .dg-notice{font-size:12px;color:#64748b}.dg-risk{padding:12px;margin-top:12px;border:1px solid #f3d5a7;border-radius:12px;background:#fffbeb}
         .dg-risk strong{color:#92400e;font-size:13px}.dg-risk p{font-size:12px;margin:6px 0;color:#78350f}
+        .dg-step{font-size:11px;color:#0f766e;letter-spacing:.06em;font-weight:800;text-transform:uppercase;margin:16px 0 7px}
+        .dg-proposal{min-height:116px;resize:vertical;font-size:14px;line-height:1.7}
+        .dg-meta-line{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:#64748b;line-height:1.5;margin:5px 0}
+        .dg-meta-line span{overflow-wrap:anywhere}
+        .dg-consent{display:flex;align-items:flex-start;gap:10px;margin:16px 0 0;background:#f8fafc;
+            border:1px solid #e2e8f0;border-radius:11px;padding:12px;font-size:12px;color:#475569;line-height:1.6;font-weight:500}
+        .dg-consent input{width:18px;height:18px;margin-top:2px;flex-shrink:0;accent-color:#0b6b62}
+        .dg-action-hint{font-size:12px;color:#64748b;margin:9px 0 0;line-height:1.6}
+        .dg-copilot-link{display:none;margin-top:12px;width:auto;border:1px solid #cbd5e1;background:#fff;color:#0f172a}
+        .dg-copilot-link:hover{background:#f1f5f9}
+        .dg-evidence{margin:14px 0;padding:15px;border:1px solid #d6e9ed;background:#f8fcfc;border-radius:12px}
+        .dg-evidence h3{margin:0 0 4px;font-size:14px;color:#154e54}
+        .dg-evidence > p{font-size:11px;line-height:1.55;color:#64748b;margin:0 0 11px}
+        .dg-term-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+        .dg-term{background:#fff;border:1px solid #dbe7ee;padding:11px;border-radius:10px;overflow-wrap:anywhere;min-height:95px}
+        .dg-term strong{font-size:12px;color:#163446;display:block}
+        .dg-term em{font-size:11px;font-style:normal;color:#64748b;display:block;margin:5px 0}
+        .dg-term q{font-size:11px;line-height:1.65;color:#0f766e;display:block;margin-top:7px;padding:7px;border-left:2px solid #14b8a6;background:#f0fdfa}
+        .dg-term .dg-unverified{font-size:11px;color:#a16207;margin-top:7px}
+        .dg-panel .dg-danger{color:#b91c1c}
+        .dg-result-mode{font-size:11px;color:#64748b;margin:0 0 10px}
+        .dg-actions .dg-primary[disabled],.dg-actions .dg-secondary[disabled]{opacity:.55;cursor:not-allowed}
+        @media(max-width:680px){.dg-term-grid{grid-template-columns:1fr}.dg-meta-line{flex-wrap:wrap}}
+
         @media(max-width:680px){.dg-config{grid-template-columns:1fr 1fr}
           .dg-hero{padding:23px 19px;border-radius:15px}
           .dg-panel{padding:18px 16px}
@@ -927,8 +951,8 @@ HTML_UI = r"""<!DOCTYPE html>
 
     <section class="dg-panel" id="dealguard_panel" aria-label="DealGuard independent audit">
         <div class="dg-panel-head">
-            <h2 id="dg_panel_title">01 / Independent deal audit</h2>
-            <span class="dg-label" id="dg_no_llm">NO GEMINI CALL REQUIRED</span>
+            <h2 id="dg_panel_title">01 / Set your deal guardrails</h2>
+            <span class="dg-label" id="dg_no_llm">CHOOSE AI OR RULES-ONLY</span>
         </div>
         <p id="dg_panel_desc">Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.</p>
         <div class="dg-config">
@@ -938,20 +962,44 @@ HTML_UI = r"""<!DOCTYPE html>
             <div><label for="dg_pay_days" id="dg_days_label">Payment days threshold</label><input type="number" id="dg_pay_days" min="0" max="3650" value="45"></div>
             <div><label for="dg_no_exclusive" id="dg_exclusive_label">Prohibit exclusivity</label><input type="checkbox" id="dg_no_exclusive" checked></div>
         </div>
-        <p class="dg-notice" id="dg_config_note">Structured thresholds control the audit. Free-text notes below provide context but do not create additional enforced rules.</p>
-        <div class="dg-actions">
-            <button type="button" class="dg-primary" onclick="runDealGuardAudit()" id="dg_check_btn">◆ Check deal constraints</button>
-            <button type="button" class="dg-secondary" onclick="loadDealGuardDemo()" id="dg_demo_btn">Load 3-rule stress test</button>
+        <p class="dg-notice" id="dg_config_note">These thresholds are the enforced rules. Free-text notes below are not machine-enforced.</p>
+        <label class="dg-step" for="dg_proposal" id="dg_proposal_label">02 / Enter the proposed deal terms</label>
+        <textarea class="dg-proposal" id="dg_proposal" rows="4" maxlength="3500" spellcheck="true"
+            placeholder="Example: Buyer wants 15% discount, net 90-day payment and exclusivity."></textarea>
+        <div class="dg-meta-line">
+            <span id="dg_source_note">Only use fictional examples. Redaction cannot guarantee confidentiality.</span>
+            <span id="dg_chars">0 / 3500</span>
         </div>
+        <div class="dg-actions">
+            <button type="button" class="dg-secondary" onclick="loadDealGuardDemo('violation')" id="dg_demo_btn">Load 3-conflict example</button>
+            <button type="button" class="dg-secondary" onclick="loadDealGuardDemo('rejected')" id="dg_reject_btn">Load rejected-offer example</button>
+        </div>
+        <label class="dg-consent" for="dg_consent">
+            <input id="dg_consent" type="checkbox"/>
+            <span id="dg_consent_text">I understand that AI mode sends the redacted text to a Gemini provider. Redaction is incomplete; I will use fictional data.</span>
+        </label>
+        <div class="dg-step" id="dg_audit_label">03 / Verify the proposal</div>
+        <div class="dg-actions">
+            <button type="button" class="dg-primary" onclick="runHybridAudit()" id="dg_hybrid_btn">✦ AI extraction + rule audit</button>
+            <button type="button" class="dg-secondary" onclick="runDealGuardAudit()" id="dg_check_btn">Rules only · no Gemini</button>
+        </div>
+        <p class="dg-action-hint" id="dg_mode_hint">AI mode extracts and quotes clauses. Rules-only is available without an API call.</p>
         <div id="dg_output" class="dg-output" role="status" aria-live="polite">
+            <div class="dg-result-mode" id="dg_mode_used"></div>
             <div class="dg-summary">
                 <strong class="dg-status unknown" id="dg_status">NOT YET CHECKED</strong>
                 <span class="dg-count" id="dg_counter"></span>
             </div>
+            <div class="dg-evidence" id="dg_evidence" style="display:none">
+                <h3 id="dg_evidence_title">What the AI extracted</h3>
+                <p id="dg_evidence_note">A quote match verifies literal text, not its commercial meaning. Review each term before acting.</p>
+                <div class="dg-term-grid" id="dg_extracted_terms"></div>
+            </div>
             <div class="dg-findings" id="dg_findings"></div>
             <div class="dg-risk" id="dg_risk" style="display:none"><strong id="dg_risk_title">Commercial risk review — separate from rules</strong><div id="dg_risk_findings"></div></div>
             <div id="dg_rule_warnings" class="dg-footnote"></div>
-            <div class="dg-footnote" id="dg_footnote">A rule audit cannot certify contractual safety or replace qualified legal and financial review.</div>
+            <div class="dg-footnote" id="dg_footnote">This is decision support, not a contract certification. Always verify ambiguous terms.</div>
+            <button type="button" class="action-btn dg-copilot-link" id="dg_copilot_btn" onclick="sendProposalToCopilot()">Use in 3-stage strategy assistant ↓</button>
         </div>
     </section>
 
