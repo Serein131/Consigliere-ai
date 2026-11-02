@@ -1,4 +1,5 @@
 name: Gemini Baseline Comparison (manual API run)
+# Diagnostic rerun: normalize accidental whitespace around the protected key
 on:
   push:
     branches: [main]
