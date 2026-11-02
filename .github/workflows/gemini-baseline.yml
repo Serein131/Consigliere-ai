@@ -1,0 +1,70 @@
+name: Gemini Baseline Comparison (manual API run)
+on:
+  workflow_dispatch:
+    inputs:
+      sample_size:
+        description: "Number of identical synthetic scenarios to compare"
+        required: true
+        type: choice
+        default: '10'
+        options:
+          - '10'
+          - '60'
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile baseline scripts
+        run: |
+          python -m py_compile research/run_gemini_baseline.py research/evaluate.py
+      - name: Verify Gemini API authorization
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::GEMINI_API_KEY GitHub Actions repository secret is missing. Gemini comparison was NOT executed."
+            exit 1
+          fi
+          echo "Gemini API authentication configured. No key value is printed."
+      - name: Run real Gemini-only baseline (quota or charges may apply)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.5-flash-lite
+          SAMPLE_SIZE: ${{ inputs.sample_size }}
+        run: |
+          python research/run_gemini_baseline.py --limit "$SAMPLE_SIZE" --sleep 2
+          python - <<'PY'
+          import json,os,pathlib,sys
+          path=pathlib.Path("research/baseline_predictions.json")
+          if not path.exists():
+              sys.exit("No Gemini predictions produced; API failed.")
+          expected=int(os.environ["SAMPLE_SIZE"])
+          observed=len(json.loads(path.read_text(encoding="utf-8")))
+          if observed!=expected:
+              sys.exit(f"Incomplete Gemini baseline: {observed}/{expected}. This is NOT a complete comparison.")
+          print(f"Gemini predicted all {observed} synthetic cases.")
+          PY
+      - name: Score ordinary Gemini versus deterministic DealGuard on paired cases
+        env:
+          SAMPLE_SIZE: ${{ inputs.sample_size }}
+        run: |
+          python research/evaluate.py --limit "$SAMPLE_SIZE" --baseline-predictions research/baseline_predictions.json --output research/gemini_baseline_report.md --json research/gemini_baseline_report.json
+          python research/evaluate.py --limit "$SAMPLE_SIZE" --output research/dealguard_paired_report.md --json research/dealguard_paired_report.json
+      - name: Upload real model predictions and paired reports
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: measured-gemini-vs-dealguard
+          path: |
+            research/baseline_predictions.json
+            research/gemini_baseline_report.md
+            research/gemini_baseline_report.json
+            research/dealguard_paired_report.md
+            research/dealguard_paired_report.json
+          retention-days: 30
