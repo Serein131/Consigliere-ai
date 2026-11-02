@@ -1388,7 +1388,10 @@ HTML_UI = r"""<!DOCTYPE html>
                 auditElement.textContent = 'DealGuard deterministic audit: ' + (audit.assessment || 'UNKNOWN') +
                     '\n' + findings.join('\n');
                 const auditView = document.getElementById('audit_view');
-                auditView.innerHTML = auditMsg;
+                // Escape interpolated payload in HTML before rendering the status message.
+                const safeAuditMsg = auditMsg.replace(/<code>([\s\S]*?)<\/code>/g, (whole, content) =>
+                    '<code>' + content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>');
+                auditView.innerHTML = safeAuditMsg;
                 auditView.appendChild(auditElement);
 
                 const badgeColor = t.risk_level === 'SAFE' ? '#059669' : (t.risk_level === 'LOW' ? '#d97706' : '#dc2626');
