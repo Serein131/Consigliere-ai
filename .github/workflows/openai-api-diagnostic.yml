@@ -1,0 +1,23 @@
+name: OpenAI API 429 diagnostic (single synthetic request)
+on:
+  push:
+    branches: [experiment/openai-error-code-diagnostic-20261102]
+    paths:
+      - '.github/workflows/openai-api-diagnostic.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: One safe OpenAI request to distinguish quota from transient rate limit
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-6-luna
+        run: |
+          python research/diagnose_openai_api.py
