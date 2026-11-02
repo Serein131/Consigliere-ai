@@ -1112,7 +1112,17 @@ HTML_UI = r"""<!DOCTYPE html>
                 error:'Audit failed: ', missing:'Enter proposed terms and hard bottom lines first.',
                 rules:{maximum_discount_pct:'Maximum discount',payment_days:'Payment days',no_exclusivity:'Exclusivity prohibited'},
                 states:{VIOLATION:'VIOLATION',PASS:'PASS',UNKNOWN:'UNKNOWN'},
-                observed:'Observed', limit:'Limit', min:'Minimum', max:'Maximum'
+                observed:'Observed', limit:'Threshold', min:'Minimum', max:'Maximum',
+                roleLabel:'Deal perspective',discountLabel:'Maximum discount (%)',payLabel:'Payment rule',
+                daysLabel:'Payment threshold (days)',exclusiveLabel:'Prohibit exclusivity',
+                configNote:'Only these structured settings determine the audited rules. Free-text notes are context for the AI, not additional checks.',
+                riskTitle:'Commercial risk review · separate from rule compliance',
+                seller:'Seller · receiving payment',buyer:'Buyer · making payment',unspecified:'Unspecified',
+                maximum:'At most (days)',minimum:'At least (days)',noRule:'No payment rule',
+                riskTitle:'Commercial risk review · separate from rule compliance',
+                reviewText:'Review independently',warningPrefix:'Rules needing clarification: ',
+                risks:{long_receivables:'Long receivables / cashflow',short_payables:'Short payables / cashflow',
+                    unlimited_liability:'Unlimited liability',auto_renewal:'Auto-renewal',termination_penalty:'Termination penalty'}
             },
             zh: {
                 kicker:'FOUNDER DEALGUARD · 创始人交易决策系统',
@@ -1128,26 +1138,64 @@ HTML_UI = r"""<!DOCTYPE html>
                 error:'审计失败：',missing:'请先填写交易底线和对方提出的条件。',
                 rules:{maximum_discount_pct:'最大折扣',payment_days:'付款期限',no_exclusivity:'禁止独家'},
                 states:{VIOLATION:'违规',PASS:'符合',UNKNOWN:'未知'},
-                observed:'观察值',limit:'上限',min:'下限',max:'上限'
+                observed:'观察值',limit:'阈值',min:'下限',max:'上限',
+                roleLabel:'交易视角',discountLabel:'最大允许折扣 (%)',payLabel:'付款期限规则',
+                daysLabel:'付款期限阈值（天）',exclusiveLabel:'禁止独家合作',
+                configNote:'独立规则审计仅使用上方结构化设置。下方自由文本仅作 AI 分析背景，不会作为额外硬规则。',
+                riskTitle:'商业风险审查 · 与规则合规分开',
+                seller:'卖方 · 等待收款',buyer:'买方 · 对外付款',unspecified:'不指定',
+                maximum:'最多（天）',minimum:'至少（天）',noRule:'不检查付款期限',
+                reviewText:'需要单独评估',warningPrefix:'待澄清的规则：',
+                risks:{long_receivables:'回款周期长 / 现金流',short_payables:'付款周期短 / 现金流',
+                    unlimited_liability:'无限责任',auto_renewal:'自动续约',termination_penalty:'提前解约罚金'}
             }
         };
+        function getStructuredRules() {
+            const discount=document.getElementById('dg_discount').value;
+            const payDir=document.getElementById('dg_pay_dir').value;
+            const payDays=document.getElementById('dg_pay_days').value;
+            return {
+                role: document.getElementById('dg_role').value,
+                discount_max_pct: discount===''?null:Number(discount),
+                payment_direction:payDir==='none'?null:payDir,
+                payment_days:payDir==='none'||payDays===''?null:Number(payDays),
+                prohibit_exclusivity:document.getElementById('dg_no_exclusive').checked
+            };
+        }
         function updateDealGuardLabels() {
             const l = DG_LABELS[currentLang];
             const ids = {
                 dg_kicker:l.kicker,dg_headline:l.headline,dg_hero_desc:l.hero,
                 dg_chip1:l.chip1,dg_chip2:l.chip2,dg_chip3:l.chip3,
                 dg_panel_title:l.panel,dg_no_llm:l.label,dg_panel_desc:l.desc,
-                dg_check_btn:l.check,dg_demo_btn:l.demo,dg_footnote:l.foot
+                dg_check_btn:l.check,dg_demo_btn:l.demo,dg_footnote:l.foot,
+                dg_role_label:l.roleLabel,dg_discount_label:l.discountLabel,
+                dg_pay_label:l.payLabel,dg_days_label:l.daysLabel,
+                dg_exclusive_label:l.exclusiveLabel,dg_config_note:l.configNote,
+                dg_risk_title:l.riskTitle
             };
             Object.keys(ids).forEach(id => { document.getElementById(id).textContent = ids[id]; });
+            const perspective=document.getElementById('dg_role');
+            perspective.options[0].text=l.seller;
+            perspective.options[1].text=l.buyer;
+            perspective.options[2].text=l.unspecified;
+            const direction=document.getElementById('dg_pay_dir');
+            direction.options[0].text=l.maximum;
+            direction.options[1].text=l.minimum;
+            direction.options[2].text=l.noRule;
             document.getElementById('dg_output').style.display='none';
         }
         function loadDealGuardDemo() {
             const zh = currentLang === 'zh';
             setPhase('in_deal');
             document.getElementById('hard_bottom_line').value = zh
-                ? '最大折扣10%；付款期限至少45天；禁止独家合作'
-                : 'max discount <=10%; payment terms >=45 days; zero exclusivity';
+                ? '目标：避免超额折扣、过长收款账期和独家合作。'
+                : 'Goal: avoid excessive discounts, long receivable terms and exclusivity.';
+            document.getElementById('dg_role').value='seller';
+            document.getElementById('dg_discount').value='10';
+            document.getElementById('dg_pay_dir').value='maximum';
+            document.getElementById('dg_pay_days').value='45';
+            document.getElementById('dg_no_exclusive').checked=true;
             document.getElementById('input_text').value = zh
                 ? '客户要求15%折扣、付款期限30天、独家合作，并希望今天签署。'
                 : 'The customer requires a 15% discount, payment terms 30 days, and an exclusivity agreement signed today.';
@@ -1187,7 +1235,8 @@ HTML_UI = r"""<!DOCTYPE html>
             try{
                 // Identifiers are masked with the same client-side helper as the three-stage app.
                 const body={text:clientSideRedact(text).sanitizedText,
-                    hard_bottom_line:clientSideRedact(rules).sanitizedText};
+                    hard_bottom_line:clientSideRedact(rules).sanitizedText,
+                    structured_rules:getStructuredRules()};
                 const res=await fetch('/audit',{method:'POST',
                     headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
                 const result=await res.json();
@@ -1200,6 +1249,21 @@ HTML_UI = r"""<!DOCTYPE html>
                 counter.textContent=(result.configured_checks || 0)+' '+l.checks+' · '+
                     (result.violation_count || 0)+' '+l.failures;
                 (result.findings || []).forEach(f=>addAuditFinding(findings,f,l));
+                const commercial=document.getElementById('dg_risk'),
+                    commercialFindings=document.getElementById('dg_risk_findings');
+                commercialFindings.replaceChildren();
+                const risks=result.commercial_risks || [];
+                commercial.style.display=risks.length?'block':'none';
+                risks.forEach(r=>{
+                    const paragraph=document.createElement('p');
+                    paragraph.textContent=(l.risks[r.code] || r.code)+
+                        (r.evidence?' · '+r.evidence:'')+' — '+
+                        (l.reviewText || 'Review separately');
+                    commercialFindings.appendChild(paragraph);
+                });
+                const warnings=(result.rule_warnings || []);
+                document.getElementById('dg_rule_warnings').textContent=
+                    warnings.length?l.warningPrefix+warnings.join('; '):'';
             }catch(err){
                 status.className='dg-status violation';
                 status.textContent=l.error+err.message;
@@ -1554,6 +1618,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 const localRedactedCount = scrubResult.redactedCount;
 
                 const payload = {
+                    structured_rules:getStructuredRules(),
                     phase: currentPhase,
                     lang: currentLang,
                     text: clientScrubbedText,
@@ -1610,8 +1675,11 @@ HTML_UI = r"""<!DOCTYPE html>
                     (f.observed === undefined ? '' : ' (observed: ' + f.observed + ')'));
                 const auditElement = document.createElement('pre');
                 auditElement.style.cssText = 'white-space:pre-wrap;padding:12px;border:1px solid #64748b;border-radius:8px;margin-top:8px';
-                auditElement.textContent = 'DealGuard deterministic audit: ' + (audit.assessment || 'UNKNOWN') +
-                    '\n' + findings.join('\n');
+                auditElement.textContent = 'DealGuard rule audit: ' + (audit.assessment || 'UNKNOWN') +
+                    '\n' + findings.join('\n') +
+                    '\nCommercial review: '+(audit.commercial_risk_level || 'NOT_ASSESSED')+
+                    (audit.commercial_risks || []).map(r=>'\n• '+r.code+': '+(r.evidence||'')).join('')+
+                    (audit.rule_warnings || []).map(w=>'\n⚠ '+w).join('');
                 const auditView = document.getElementById('audit_view');
                 // Escape interpolated payload in HTML before rendering the status message.
                 const safeAuditMsg = auditMsg.replace(/<code>([\s\S]*?)<\/code>/g, (whole, content) =>
