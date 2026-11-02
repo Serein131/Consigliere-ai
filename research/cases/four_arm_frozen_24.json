@@ -1,0 +1,400 @@
+{
+  "dataset_name": "consigliere_four_arm_unseen_synthetic_v1",
+  "created_utc": "2026-11-02",
+  "status": "FROZEN BEFORE FOUR-ARM EVALUATION",
+  "schema_version": 1,
+  "label_source": "AI-assisted author labeling, not independent expert ground truth",
+  "protocol": "Created after four-arm implementation but before any model or deterministic system scored these cases; do not change labels based on outcome. Pairs of A/B direct-model prompts identical, C deterministic, D extraction plus verified rules.",
+  "cases": [
+    {
+      "id": "F4-001",
+      "category": "discount",
+      "language": "en",
+      "proposal": "Board memo: the customer seeks a twelve percent discount on first-year services.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Written-out percentage"
+    },
+    {
+      "id": "F4-002",
+      "category": "discount",
+      "language": "en",
+      "proposal": "The amended quote grants an 8% discount; the original 16% request was withdrawn.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Accepted current vs withdrawn old"
+    },
+    {
+      "id": "F4-003",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "报价单写明优惠幅度为12％，须由财务主管批准。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Fullwidth mark; conditional but explicit offer"
+    },
+    {
+      "id": "F4-004",
+      "category": "discount",
+      "language": "en",
+      "proposal": "Supplier has not decided whether any discount will be offered.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Unspecified term"
+    },
+    {
+      "id": "F4-005",
+      "category": "discount",
+      "language": "zh",
+      "proposal": "先前要求15%折扣，但双方明确拒绝该方案；新折扣待定。",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Rejected old offer"
+    },
+    {
+      "id": "F4-006",
+      "category": "payment",
+      "language": "en",
+      "proposal": "The purchaser asks to pay 75 days after receipt of a valid invoice.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": "Seller-long receivables"
+    },
+    {
+      "id": "F4-007",
+      "category": "payment",
+      "language": "en",
+      "proposal": "Our signed schedule now says net 30; the previous net 90 draft is obsolete.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Final supersedes prior"
+    },
+    {
+      "id": "F4-008",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "买方建议货款在验收后第70天支付。",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": "Chinese reordered days"
+    },
+    {
+      "id": "F4-009",
+      "category": "payment",
+      "language": "zh",
+      "proposal": "采购方须在发票开具后10天内付款。",
+      "structured_rules": {
+        "role": "buyer",
+        "payment_direction": "minimum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "short_payables"
+      ],
+      "annotation_note": "Buyer short payment"
+    },
+    {
+      "id": "F4-010",
+      "category": "payment",
+      "language": "en",
+      "proposal": "No payment due date is included; finance will negotiate one next week.",
+      "structured_rules": {
+        "role": "seller",
+        "payment_direction": "maximum",
+        "payment_days": 45
+      },
+      "expected_rule_status": {
+        "payment_days": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "No stated term"
+    },
+    {
+      "id": "F4-011",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "Our largest customer is demanding sole distribution rights throughout Europe.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Exclusivity expressed as sole rights"
+    },
+    {
+      "id": "F4-012",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "The executed addendum excludes exclusivity; the earlier sole-supplier clause was deleted.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Clause explicitly removed"
+    },
+    {
+      "id": "F4-013",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "渠道商希望获得独家授权，合作期六个月。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Present exclusive demand"
+    },
+    {
+      "id": "F4-014",
+      "category": "exclusivity",
+      "language": "zh",
+      "proposal": "双方都声明不要求排他性销售权。",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Explicit negation"
+    },
+    {
+      "id": "F4-015",
+      "category": "exclusivity",
+      "language": "en",
+      "proposal": "Exclusive territory may be discussed in future, but it is not currently proposed.",
+      "structured_rules": {
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Potential future only"
+    },
+    {
+      "id": "F4-016",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "Procurement proposes 14% discount, net 80 days and a 12-month exclusivity requirement.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION",
+        "payment_days": "VIOLATION",
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [
+        "long_receivables"
+      ],
+      "annotation_note": "Multiple violations"
+    },
+    {
+      "id": "F4-017",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "最终版条款为折扣9%，付款期限30天，且不需要独家代理。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS",
+        "payment_days": "PASS",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Final compliant terms"
+    },
+    {
+      "id": "F4-018",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "The initial 18% discount was rejected. We agreed 7% discount and net 35 days, while exclusivity remains undecided.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS",
+        "payment_days": "PASS",
+        "no_exclusivity": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "One unknown"
+    },
+    {
+      "id": "F4-019",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "对方要求15%折扣，同时主张独家经销，付款期限尚未填写。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION",
+        "payment_days": "UNKNOWN",
+        "no_exclusivity": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Partial absence"
+    },
+    {
+      "id": "F4-020",
+      "category": "mixed",
+      "language": "en",
+      "proposal": "Two proposals remain open: 8% discount with net 30, or 13% discount with net 70. Nobody has agreed. No exclusive arrangement is proposed.",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN",
+        "payment_days": "UNKNOWN",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Unresolved alternative bundles"
+    },
+    {
+      "id": "F4-021",
+      "category": "mixed",
+      "language": "zh",
+      "proposal": "合同附件先前载有独家授权及折扣16%，但最终双方确认无独家、折扣8%，账期40天。",
+      "structured_rules": {
+        "role": "seller",
+        "discount_max_pct": 10,
+        "payment_direction": "maximum",
+        "payment_days": 45,
+        "prohibit_exclusivity": true
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS",
+        "payment_days": "PASS",
+        "no_exclusivity": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Supersession"
+    },
+    {
+      "id": "F4-022",
+      "category": "commercial",
+      "language": "en",
+      "proposal": "The final signed terms include unlimited indemnification and an automatic renewal clause.",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "unlimited_liability",
+        "auto_renewal"
+      ],
+      "annotation_note": "Two active risks"
+    },
+    {
+      "id": "F4-023",
+      "category": "commercial",
+      "language": "zh",
+      "proposal": "双方删除了自动续约条款，最新签署版本也没有解约违约金。",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [],
+      "annotation_note": "Deleted terms not active"
+    },
+    {
+      "id": "F4-024",
+      "category": "commercial",
+      "language": "en",
+      "proposal": "The customer receives net 100 days; termination penalty applies after cancellation.",
+      "structured_rules": {
+        "role": "seller"
+      },
+      "expected_rule_status": {},
+      "expected_commercial_risks": [
+        "long_receivables",
+        "termination_penalty"
+      ],
+      "annotation_note": "Long receivables and cancellation penalty"
+    }
+  ]
+}
