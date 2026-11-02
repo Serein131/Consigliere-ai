@@ -4,7 +4,8 @@ import os
 import urllib.error
 import urllib.request
 
-KEY = os.environ.get("GEMINI_API_KEY", "")
+RAW_KEY = os.environ.get("GEMINI_API_KEY", "")
+KEY = RAW_KEY.strip()
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 HOST = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -47,7 +48,8 @@ def get(path, body=None):
         return ("NETWORK", "NETWORK", "UNAVAILABLE")
 
 print("Key has value:", bool(KEY))
-print("Key contains whitespace:", any(c.isspace() for c in KEY))
+print("Key has leading/trailing whitespace:", KEY != RAW_KEY)
+print("Key has internal whitespace:", any(c.isspace() for c in KEY))
 if not KEY:
     raise SystemExit("No key configured; no requests made.")
 checks = [
