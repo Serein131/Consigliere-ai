@@ -168,17 +168,17 @@ Objective: Prepare verifiable facts, constraints, questions and a measured openi
 - In 'triggered_rule': Cite the exact reservation value (BATNA / Hard Bottom Line) most at risk today and lock it.
 - In 'box1_text': [Opening Anchor & Framing]: Proactive agenda frame or opening anchor the user should set in the first 2 minutes.
 - In 'box2_text': [Predicted Traps & Signaling Test]: Specific traps to anticipate and how to test whether opponent claims are 'Cheap Talk' vs. 'Costly Signals'.
-- In 'box3_text': [Behavioral Circuit Breaker]: Concrete pause/delay tactic tailored to user's vulnerability.
+- In 'box3_text': [Decision Reminder]: Pause or verification steps grounded in user-entered preferences.
 - In 'counter_question': [Pre-Meeting Reminder Draft]: One concise reminder for the user to copy; do not claim it was delivered by SMS.
 - In 'draft_reply': [Pre-Meeting Agenda Opener]: Crisp opening statement to establish leverage before sitting down.""",
 
         "in_deal": """CURRENT STAGE: PHASE 2 — IN-DEAL LIVE INTERVENTION (战中无痕交锋与三元拆解).
-Objective: The user captured live counterparty demands or speech transcripts. Apply Nash Bargaining, Cheap Talk filtering, and Epistemic Game Theory without illegal continuous recording.
-- NO FALSE POSITIVES: If counterparty agrees to terms, set 'risk_level' to 'SAFE' and 'trap_or_intent' to 'Constructive Alignment' (良性推进).
-- If counterparty attempts aggressive price cuts (>10%), demands exclusivity, compresses payment terms (<45d), or imposes artificial deadlines, set 'risk_level' to 'CRITICAL' or 'MEDIUM'.
+Objective: Analyze voluntarily provided text or user-controlled transcripts. Distinguish explicitly stated terms, hypotheses and unknowns.
+- Do not infer a safe transaction merely because the other party is cooperative. Explicitly check rule evidence.
+- Use only the configured structured thresholds and deterministic audit for rule conflicts; never assume fixed 10% or 45-day constraints.
 - In 'triggered_rule': Cite which exact Goal, Budget, or Hard Bottom Line was triggered or satisfied.
 - In 'box1_text': [Verified Facts]: Objective terms explicitly stated by counterparty (zero speculation).
-- In 'box2_text': [Strategic Inferences]: Opponent's hidden leverage play, information asymmetry, or Cheap Talk bluff.
+- In 'box2_text': [Strategic Inferences]: Clearly labeled alternative interpretations; do not claim knowledge of the opponent's intentions.
 - In 'box3_text': [Unknowns to Probe]: Critical missing variables required to test their bluff or verify constraints.
 - In 'counter_question': [Live Counter-Question (<25 words)]: Sharp, non-defensive question to say out loud right now to flip leverage.
 - In 'draft_reply': [Tactical Reply / Live Pivot]: Complete, poised response ready to speak or negotiate.""",
@@ -204,12 +204,12 @@ Objective: The user dictated a 60s summary right after the meeting. Cross-examin
         if session_context.get("in_deal"):
             session_history_str += f"\n[STAGE 2 IN-DEAL HISTORY (Live Context)]: {json.dumps(session_context['in_deal'], ensure_ascii=False)}"
 
-    system_instruction = f"""You are Consigliere AI (v4.6), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
+    system_instruction = f"""You are Consigliere AI (v5.1), an evidence-aware commercial negotiation decision assistant.
 You support user-controlled, consent-based workflows; never assume recording is illegal or automatically private. You are not a lawyer.
 
 USER STRATEGIC PROFILE (MEMORY BANK):
 - [Core Goal & Budget]: {user_goal}
-- [Hard Bottom Lines (Reservation Values / BATNA)]: {hard_bottom_line}
+- [Free-text context, not machine-enforced thresholds]: {hard_bottom_line}
 - [User-entered decision preferences]: {risk_preference}
 
 {asr_fuzzy_repair_instruction}
@@ -222,11 +222,11 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
 {{
   "risk_level": "SAFE, LOW, MEDIUM, or CRITICAL",
   "trap_or_intent": "Classification or audit verdict",
-  "triggered_rule": "Explicit reference to user's Goal, Bottom Line, or Vulnerability",
+  "triggered_rule": "Evidence-based reference to user-configured constraints or unknowns",
   "box1_text": "Pillar 1 Content",
   "box2_text": "Pillar 2 Content",
   "box3_text": "Pillar 3 Content",
-  "counter_question": "Immediate counter-question or SMS wake-up alert (<25 words)",
+  "counter_question": "Immediate counter-question or copyable reminder draft (<25 words)",
   "draft_reply": "Complete follow-up email, tactical reply draft, or pre-meeting framing note"
 }}"""
 
@@ -1537,7 +1537,7 @@ HTML_UI = r"""<!DOCTYPE html>
             errBox.style.display = 'none';
             isAgentRunning = true;
             runBtn.disabled = true;
-            runBtn.innerText = currentLang === 'zh' ? '⏳ 正在执行全周期博弈推演 (1~2秒)...' : '⏳ Running Game-Theoretic Deduction (1-2s)...';
+            runBtn.innerText = currentLang === 'zh' ? '⏳ 正在执行全周期博弈推演...' : '⏳ Running Game-Theoretic Deduction...';
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 18000);
@@ -1598,8 +1598,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 updatePillarHeaders();
 
                 const auditMsg = currentLang === 'zh'
-                    ? `🛡️ <strong>客户端正则脱敏已运行（不能保证覆盖全部敏感信息）：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（原始敏感词未出设备） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际离开浏览器并发往模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
-                    : `🛡️ <strong>Regex-based redaction applied (not a complete privacy guarantee):</strong> <b>${localRedactedCount}</b> sensitive entities scrubbed in browser memory prior to network call | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Actual Sanitized Payload Sent:</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
+                    ? `🛡️ <strong>客户端正则脱敏已运行（不能保证覆盖全部敏感信息）：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（无法确保所有敏感信息已删除） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>实际离开浏览器并发往模型的脱敏 Payload：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
+                    : `🛡️ <strong>Regex-based redaction applied (not a complete privacy guarantee):</strong> <b>${localRedactedCount}</b> possible identifiers replaced by client regex before network request | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Actual Sanitized Payload Sent:</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
 
                 const audit = data.dealguard_audit || {};
                 const findings = (audit.findings || []).map(f => f.rule + ': ' + f.status +
