@@ -312,7 +312,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v4.6 — Full-Cycle Game-Theoretic Chief of Staff</title>
+    <title>Consigliere AI v5.0 | Founder DealGuard — Auditable Decision Intelligence</title>
     <style>
         :root {
             --bg-canvas: #f8fafc;
@@ -807,12 +807,56 @@ HTML_UI = r"""<!DOCTYPE html>
             .grid-2, .tri-grid, .phase-tabs, .btn-row { grid-template-columns: 1fr; flex-direction: column; }
             .card { padding: 18px 16px; }
         }
+
+        /* DealGuard V5 — clear, testable decision layer */
+        .dg-hero {background:linear-gradient(120deg,#0b1731 0%,#102d47 57%,#123d43 100%);color:#f8fafc;
+            border:1px solid #24425a;border-radius:20px;padding:28px 30px;margin:18px 0 23px;
+            box-shadow:0 20px 45px -26px rgba(7,31,47,.8);position:relative;overflow:hidden}
+        .dg-hero::after{content:"";position:absolute;right:-68px;top:-102px;width:275px;height:275px;
+            border-radius:50%;background:radial-gradient(circle,rgba(57,196,169,.15),transparent 66%);pointer-events:none}
+        .dg-kicker{font-size:11px;font-weight:800;letter-spacing:.16em;color:#7dd3c0;text-transform:uppercase;margin-bottom:10px}
+        .dg-hero h1{font-size:clamp(24px,4vw,36px);line-height:1.18;letter-spacing:-.03em;margin:0 0 9px;font-weight:800;max-width:690px}
+        .dg-subtitle{font-size:14px;line-height:1.65;color:#cedbe6;max-width:720px;margin:0 0 18px}
+        .dg-chips{display:flex;gap:9px;flex-wrap:wrap}
+        .dg-chip{border:1px solid rgba(192,226,227,.26);background:rgba(255,255,255,.06);
+            color:#d8eeee;border-radius:999px;padding:6px 11px;font-size:12px;font-weight:600}
+        .dg-panel{background:#fff;border:1px solid #d7e3ed;border-radius:17px;
+            padding:22px 24px;box-shadow:0 6px 24px -16px rgba(8,30,48,.20);margin-bottom:22px}
+        .dg-panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+        .dg-panel h2{font-size:17px;line-height:1.4;margin:0;font-weight:800}
+        .dg-panel p{margin:7px 0 14px;font-size:13px;color:#64748b}
+        .dg-label{background:#edfdf7;color:#047857;border:1px solid #a7f3d0;border-radius:999px;
+            padding:4px 9px;font-size:11px;font-weight:800}
+        .dg-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+        .dg-actions button{width:auto;margin:0;padding:11px 15px;border-radius:9px;font-size:13px;font-weight:750}
+        .dg-primary{background:#0b6b62;color:#fff;border:1px solid #0b6b62}
+        .dg-primary:hover{background:#07534e}
+        .dg-secondary{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
+        .dg-secondary:hover{background:#e2e8f0}
+        .dg-output{display:none;margin-top:17px;border-top:1px solid #e2e8f0;padding-top:16px}
+        .dg-summary{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap;margin-bottom:11px}
+        .dg-status{font-size:13px;font-weight:850;letter-spacing:.02em}
+        .dg-status.violation{color:#b91c1c}.dg-status.unknown{color:#a16207}.dg-status.pass{color:#047857}
+        .dg-count{font-size:12px;color:#64748b}
+        .dg-findings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+        .dg-finding{padding:12px;border:1px solid #e2e8f0;border-radius:11px;min-height:86px;background:#f8fafc}
+        .dg-finding-title{font-size:12px;font-weight:750;color:#0f172a;margin-bottom:6px}
+        .dg-finding-state{font-size:12px;font-weight:750}
+        .dg-finding-state.violation{color:#b91c1c}.dg-finding-state.unknown{color:#a16207}.dg-finding-state.pass{color:#047857}
+        .dg-finding-evidence{font-size:11px;color:#475569;line-height:1.55;margin-top:6px;overflow-wrap:anywhere}
+        .dg-footnote{font-size:11px;color:#64748b;margin-top:12px;line-height:1.6}
+        @media(max-width:680px){
+          .dg-hero{padding:23px 19px;border-radius:15px}
+          .dg-panel{padding:18px 16px}
+          .dg-findings{grid-template-columns:1fr}
+          .dg-actions button{flex:1;min-width:140px}
+        }
     </style>
 </head>
 <body>
     <div class="header-row">
         <div>
-            <div class="main-title">⚡ Consigliere AI <span class="badge">v4.6 — Fault-Tolerant Chief of Staff</span></div>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.0 · Founder DealGuard</span></div>
             <div class="subtitle" id="subtitle_text">Solving Recording Dilemma: T-15m Wargame • Noise-Suppressed In-Deal • T+0m Debrief</div>
         </div>
         <div class="lang-switch">
@@ -820,6 +864,39 @@ HTML_UI = r"""<!DOCTYPE html>
             <button type="button" class="lang-btn" id="btn_zh" onclick="setLanguage('zh')">🇨🇳 中文</button>
         </div>
     </div>
+
+
+    <!-- DealGuard-first product surface: distinct from the existing three-stage copilot -->
+    <section class="dg-hero" aria-label="Founder DealGuard">
+        <div class="dg-kicker" id="dg_kicker">FOUNDER DEALGUARD · DECISION INTELLIGENCE</div>
+        <h1 id="dg_headline">Know your red lines before you make a deal.</h1>
+        <p class="dg-subtitle" id="dg_hero_desc">A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.</p>
+        <div class="dg-chips">
+            <span class="dg-chip" id="dg_chip1">✓ Explicit rule checks</span>
+            <span class="dg-chip" id="dg_chip2">✓ Evidence, not guesswork</span>
+            <span class="dg-chip" id="dg_chip3">✓ Unknown ≠ Safe</span>
+        </div>
+    </section>
+
+    <section class="dg-panel" id="dealguard_panel" aria-label="DealGuard independent audit">
+        <div class="dg-panel-head">
+            <h2 id="dg_panel_title">01 / Independent deal audit</h2>
+            <span class="dg-label" id="dg_no_llm">NO GEMINI CALL REQUIRED</span>
+        </div>
+        <p id="dg_panel_desc">Uses your Hard Bottom Lines and the proposal text below. Detects explicit discount, payment-window, and exclusivity rule conflicts. The rules are inspectable and conservative.</p>
+        <div class="dg-actions">
+            <button type="button" class="dg-primary" onclick="runDealGuardAudit()" id="dg_check_btn">◆ Check deal constraints</button>
+            <button type="button" class="dg-secondary" onclick="loadDealGuardDemo()" id="dg_demo_btn">Load 3-rule stress test</button>
+        </div>
+        <div id="dg_output" class="dg-output" role="status" aria-live="polite">
+            <div class="dg-summary">
+                <strong class="dg-status unknown" id="dg_status">NOT YET CHECKED</strong>
+                <span class="dg-count" id="dg_counter"></span>
+            </div>
+            <div class="dg-findings" id="dg_findings"></div>
+            <div class="dg-footnote" id="dg_footnote">A rule audit cannot certify contractual safety or replace qualified legal and financial review.</div>
+        </div>
+    </section>
 
     <!-- 1. 首席幕僚记忆库 -->
     <div class="card">
@@ -998,6 +1075,117 @@ HTML_UI = r"""<!DOCTYPE html>
             }
         };
 
+
+        // DealGuard v5: direct, model-independent rule audit; all displayed results use textContent.
+        const DG_LABELS = {
+            en: {
+                kicker: 'FOUNDER DEALGUARD · DECISION INTELLIGENCE',
+                headline: 'Know your red lines before you make a deal.',
+                hero: 'A verifiable commitment firewall for founders. Check proposed terms against your own commercial rules — then use Consigliere AI to explore negotiation options.',
+                chip1:'✓ Explicit rule checks', chip2:'✓ Evidence, not guesswork', chip3:'✓ Unknown ≠ Safe',
+                panel:'01 / Independent deal audit', label:'NO GEMINI CALL REQUIRED',
+                desc:'Uses your Hard Bottom Lines and the proposal text below. Detects explicit discount, payment-window, and exclusivity rule conflicts. The rules are inspectable and conservative.',
+                check:'◆ Check deal constraints', demo:'Load 3-rule stress test', pending:'Checking…',
+                notyet:'NOT YET CHECKED', violation:'RULE VIOLATION', unknown:'NEEDS VERIFICATION',
+                pass:'NO DETECTED VIOLATION', checks:'checks', failures:'violations',
+                foot:'Checks only supported, explicitly stated rules. No detected violation does not mean the deal is commercially or legally safe.',
+                error:'Audit failed: ', missing:'Enter proposed terms and hard bottom lines first.',
+                rules:{maximum_discount_pct:'Maximum discount',payment_days:'Payment days',no_exclusivity:'Exclusivity prohibited'},
+                states:{VIOLATION:'VIOLATION',PASS:'PASS',UNKNOWN:'UNKNOWN'},
+                observed:'Observed', limit:'Limit', min:'Minimum', max:'Maximum'
+            },
+            zh: {
+                kicker:'FOUNDER DEALGUARD · 创始人交易决策系统',
+                headline:'签约之前，先守住你的交易底线。',
+                hero:'面向初创公司创始人的可审计交易承诺防火墙。先用独立规则引擎检查交易条件，再让 Consigliere AI 提供谈判策略。',
+                chip1:'✓ 明确规则校验',chip2:'✓ 可核查证据',chip3:'✓ 未知不等于安全',
+                panel:'01 / 独立交易底线审计',label:'不调用 GEMINI · 无需模型配额',
+                desc:'读取下方的「绝对底线」与「当前阶段输入」，检查明确的折扣、付款期限和独家条款冲突。未知情况不会伪装成安全。',
+                check:'◆ 立即检查交易底线',demo:'加载 3 项违规演示',pending:'审计中…',
+                notyet:'尚未检查',violation:'发现底线违规',unknown:'需要进一步核实',
+                pass:'未发现规则冲突',checks:'项检查',failures:'项违规',
+                foot:'只检查已支持且能够识别的明确规则。未发现违规不代表交易在法律或商业上安全。',
+                error:'审计失败：',missing:'请先填写交易底线和对方提出的条件。',
+                rules:{maximum_discount_pct:'最大折扣',payment_days:'付款期限',no_exclusivity:'禁止独家'},
+                states:{VIOLATION:'违规',PASS:'符合',UNKNOWN:'未知'},
+                observed:'观察值',limit:'上限',min:'下限',max:'上限'
+            }
+        };
+        function updateDealGuardLabels() {
+            const l = DG_LABELS[currentLang];
+            const ids = {
+                dg_kicker:l.kicker,dg_headline:l.headline,dg_hero_desc:l.hero,
+                dg_chip1:l.chip1,dg_chip2:l.chip2,dg_chip3:l.chip3,
+                dg_panel_title:l.panel,dg_no_llm:l.label,dg_panel_desc:l.desc,
+                dg_check_btn:l.check,dg_demo_btn:l.demo,dg_footnote:l.foot
+            };
+            Object.keys(ids).forEach(id => { document.getElementById(id).textContent = ids[id]; });
+            document.getElementById('dg_output').style.display='none';
+        }
+        function loadDealGuardDemo() {
+            const zh = currentLang === 'zh';
+            setPhase('in_deal');
+            document.getElementById('hard_bottom_line').value = zh
+                ? '最大折扣10%；付款期限至少45天；禁止独家合作'
+                : 'max discount <=10%; payment terms >=45 days; zero exclusivity';
+            document.getElementById('input_text').value = zh
+                ? '客户要求15%折扣、付款期限30天、独家合作，并希望今天签署。'
+                : 'The customer requires a 15% discount, payment terms 30 days, and an exclusivity agreement signed today.';
+            runDealGuardAudit();
+        }
+        function addAuditFinding(parent, finding, l) {
+            const card=document.createElement('div'); card.className='dg-finding';
+            const title=document.createElement('div');title.className='dg-finding-title';
+            title.textContent=l.rules[finding.rule] || finding.rule;
+            const st=document.createElement('div');st.className='dg-finding-state '+
+                (finding.status === 'VIOLATION' ? 'violation' : finding.status === 'PASS' ? 'pass' : 'unknown');
+            st.textContent=l.states[finding.status] || 'UNKNOWN';
+            const ev=document.createElement('div');ev.className='dg-finding-evidence';
+            const parts=[];
+            if(finding.observed!==undefined)parts.push(l.observed+': '+finding.observed);
+            if(finding.limit!==undefined)parts.push(l.limit+': '+finding.limit);
+            if(finding.minimum!==undefined && finding.minimum!==null)parts.push(l.min+': '+finding.minimum);
+            if(finding.maximum!==undefined && finding.maximum!==null)parts.push(l.max+': '+finding.maximum);
+            if(finding.evidence && finding.evidence !== 'Explicit exclusivity language detected.')parts.push(finding.evidence);
+            if(finding.reason)parts.push(finding.reason);
+            ev.textContent=parts.join(' · ');
+            card.appendChild(title);card.appendChild(st);card.appendChild(ev);parent.appendChild(card);
+        }
+        async function runDealGuardAudit() {
+            const l=DG_LABELS[currentLang],output=document.getElementById('dg_output'),
+                status=document.getElementById('dg_status'),
+                counter=document.getElementById('dg_counter'),
+                findings=document.getElementById('dg_findings'),
+                btn=document.getElementById('dg_check_btn');
+            output.style.display='block';findings.replaceChildren();counter.textContent='';
+            const text=document.getElementById('input_text').value;
+            const rules=document.getElementById('hard_bottom_line').value;
+            if(!text.trim() || !rules.trim()){
+                status.className='dg-status unknown';status.textContent=l.missing;return;
+            }
+            btn.disabled=true;status.className='dg-status unknown';status.textContent=l.pending;
+            try{
+                // Identifiers are masked with the same client-side helper as the three-stage app.
+                const body={text:clientSideRedact(text).sanitizedText,
+                    hard_bottom_line:clientSideRedact(rules).sanitizedText};
+                const res=await fetch('/audit',{method:'POST',
+                    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+                const result=await res.json();
+                if(!res.ok || result.error)throw new Error(result.error || 'HTTP '+res.status);
+                const state=result.assessment || 'UNKNOWN';
+                status.className='dg-status '+(state==='VIOLATION'?'violation':
+                    state==='NO_DETECTED_VIOLATION'?'pass':'unknown');
+                status.textContent=state==='VIOLATION'?l.violation:
+                    state==='NO_DETECTED_VIOLATION'?l.pass:l.unknown;
+                counter.textContent=(result.configured_checks || 0)+' '+l.checks+' · '+
+                    (result.violation_count || 0)+' '+l.failures;
+                (result.findings || []).forEach(f=>addAuditFinding(findings,f,l));
+            }catch(err){
+                status.className='dg-status violation';
+                status.textContent=l.error+err.message;
+            }finally{btn.disabled=false;}
+        }
+
         function setPhase(phase) {
             currentPhase = phase;
             ['pre_deal', 'in_deal', 'post_deal'].forEach(p => {
@@ -1108,6 +1296,7 @@ HTML_UI = r"""<!DOCTYPE html>
 
         function setLanguage(lang) {
             currentLang = lang;
+            updateDealGuardLabels();
             document.getElementById('btn_en').className = 'lang-btn' + (lang === 'en' ? ' active' : '');
             document.getElementById('btn_zh').className = 'lang-btn' + (lang === 'zh' ? ' active' : '');
 
