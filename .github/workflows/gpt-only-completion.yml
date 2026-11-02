@@ -23,12 +23,12 @@ jobs:
           echo 'Frozen case checksum:'
           sha256sum "$CASES"
       - name: Reuse original 24-case A C D model predictions
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           run-id: 41422998049
+          artifact-ids: 13132523079
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
-          name: four-arm-measured-and-provider-availability
           path: research/
       - name: Verify imported predictions align with frozen case IDs
         run: |
