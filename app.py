@@ -105,7 +105,8 @@ def audit_only():
     # Percentages / durations must remain measurable; identifiers and money are scrubbed.
     return jsonify(check_deal(
         server_fallback_redact(text)["sanitized_text"],
-        server_fallback_redact(rules)["sanitized_text"]
+        server_fallback_redact(rules)["sanitized_text"],
+        payload.get("structured_rules")
     ))
 
 @app.route("/analyze", methods=["POST"])
@@ -126,7 +127,7 @@ def analyze_negotiation():
 
     redaction_result = server_fallback_redact(incoming_text)
     sanitized_text = redaction_result["sanitized_text"]
-    dealguard_audit = check_deal(sanitized_text, hard_bottom_line)
+    dealguard_audit = check_deal(sanitized_text, hard_bottom_line, payload.get("structured_rules"))
     user_goal = server_fallback_redact(user_goal)["sanitized_text"]
     hard_bottom_line = server_fallback_redact(hard_bottom_line)["sanitized_text"]
     risk_preference = server_fallback_redact(risk_preference)["sanitized_text"]
@@ -162,13 +163,13 @@ You MUST cross-reference the input with the User's Strategic Profile (Goals, Bot
 
     phase_instructions = {
         "pre_deal": """CURRENT STAGE: PHASE 1 — T-15m PRE-DEAL BRIEFING & WARGAMING (战前15分钟沙盘预警).
-Objective: 70% of negotiations are won before speaking. Arm the user psychologically and game-theoretically before entering the room.
+Objective: Prepare verifiable facts, constraints, questions and a measured opening. Do not imply a proven win rate.
 - In 'trap_or_intent': Identify the most likely Game-Theoretic Playbook the opponent will use (e.g. Ultimatum Game / Artificial Urgency / Cheap Talk Future Bait).
 - In 'triggered_rule': Cite the exact reservation value (BATNA / Hard Bottom Line) most at risk today and lock it.
 - In 'box1_text': [Opening Anchor & Framing]: Proactive agenda frame or opening anchor the user should set in the first 2 minutes.
 - In 'box2_text': [Predicted Traps & Signaling Test]: Specific traps to anticipate and how to test whether opponent claims are 'Cheap Talk' vs. 'Costly Signals'.
 - In 'box3_text': [Behavioral Circuit Breaker]: Concrete pause/delay tactic tailored to user's vulnerability.
-- In 'counter_question': [T-15m SMS Wake-Up Alert]: Ultra-punchy 1-sentence SMS alert sent to user's phone 15 mins before entering.
+- In 'counter_question': [Pre-Meeting Reminder Draft]: One concise reminder for the user to copy; do not claim it was delivered by SMS.
 - In 'draft_reply': [Pre-Meeting Agenda Opener]: Crisp opening statement to establish leverage before sitting down.""",
 
         "in_deal": """CURRENT STAGE: PHASE 2 — IN-DEAL LIVE INTERVENTION (战中无痕交锋与三元拆解).
@@ -204,12 +205,12 @@ Objective: The user dictated a 60s summary right after the meeting. Cross-examin
             session_history_str += f"\n[STAGE 2 IN-DEAL HISTORY (Live Context)]: {json.dumps(session_context['in_deal'], ensure_ascii=False)}"
 
     system_instruction = f"""You are Consigliere AI (v4.6), a Full-Cycle Game-Theoretic Chief of Staff & Negotiation Copilot.
-You replace illegal/intrusive full-room continuous audio surveillance with a 3-stage cognitive defense architecture.
+You support user-controlled, consent-based workflows; never assume recording is illegal or automatically private. You are not a lawyer.
 
 USER STRATEGIC PROFILE (MEMORY BANK):
 - [Core Goal & Budget]: {user_goal}
 - [Hard Bottom Lines (Reservation Values / BATNA)]: {hard_bottom_line}
-- [Behavioral Vulnerabilities & Risk Profile]: {risk_preference}
+- [User-entered decision preferences]: {risk_preference}
 
 {asr_fuzzy_repair_instruction}
 
@@ -232,6 +233,8 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
     user_prompt = f"[{phase.upper()} INPUT (Sanitized)]: {sanitized_text}{session_history_str}"
     user_prompt += "\n[DETERMINISTIC DEALGUARD AUDIT]: " + json.dumps(dealguard_audit, ensure_ascii=False)
     user_prompt += "\nExplicit audit findings take precedence. UNKNOWN does not mean SAFE. Never invent terms or assert inferred motives as facts."
+    user_prompt += "\nSeparate rule compliance from commercial risk. A passed explicit rule does not imply a good or legally safe deal. Treat REJECTED/HISTORICAL terms as non-binding and seek clarification for contradictions."
+    user_prompt += "\nThis is decision support only; no legal advice or contract execution."
 
     primary_model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
     candidate_models = [primary_model, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3-flash-preview"]
@@ -292,6 +295,8 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
             prefix = "确定性规则审计检测到交易底线冲突。" if lang_pref == "zh" else "Deterministic rule audit detected explicit constraint violation."
             tactical_output["triggered_rule"] = prefix + " " + str(tactical_output.get("triggered_rule",""))
         elif dealguard_audit["assessment"] == "UNKNOWN" and tactical_output["risk_level"] == "SAFE":
+            tactical_output["risk_level"] = "LOW"
+        if dealguard_audit["commercial_risks"] and tactical_output["risk_level"] == "SAFE":
             tactical_output["risk_level"] = "LOW"
         latency_ms = round((time.perf_counter() - start_time) * 1000)
 
