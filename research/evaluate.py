@@ -148,6 +148,12 @@ def main():
         predictions=json.loads(pathlib.Path(args.baseline_predictions).read_text(encoding="utf-8"))
         if not isinstance(predictions,list):
             raise SystemExit("Baseline predictions must be a JSON array")
+    if predictions is not None:
+        provided={p["id"] for p in predictions}
+        cases=[case for case in cases if case["id"] in provided]
+        if not cases:
+            raise SystemExit("No case IDs match the provided predictions")
+        print(f"Comparing baseline on {len(cases)} selected case IDs only; not the full 60-case set.")
     result=evaluate(cases,predictions)
     pathlib.Path(args.output).parent.mkdir(parents=True,exist_ok=True)
     pathlib.Path(args.output).write_text(markdown(result,"Generic LLM submitted predictions" if predictions is not None else "DealGuard deterministic audit"),encoding="utf-8")
