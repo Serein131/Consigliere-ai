@@ -356,7 +356,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v5.2 | Founder DealGuard — Evidence-First Audit</title>
+    <title>Consigliere AI v5.3 | Prepare · Protect · Debrief</title>
     <style>
         :root {
             --bg-canvas: #f8fafc;
@@ -929,7 +929,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <body>
     <div class="header-row">
         <div>
-            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.2 · Founder DealGuard</span></div>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.3 · Unified Negotiation Agent</span></div>
             <div class="subtitle" id="subtitle_text">Set limits · Verify terms · Explore options</div>
         </div>
         <div class="lang-switch">
@@ -939,24 +939,62 @@ HTML_UI = r"""<!DOCTYPE html>
     </div>
 
 
-    <!-- DealGuard-first product surface: distinct from the existing three-stage copilot -->
-    <section class="dg-hero" aria-label="Founder DealGuard">
-        <div class="dg-kicker" id="dg_kicker">FOUNDER DEALGUARD · DECISION INTELLIGENCE</div>
-        <h1 id="dg_headline">Know your red lines before you make a deal.</h1>
-        <p class="dg-subtitle" id="dg_hero_desc">Set your thresholds, inspect cited terms, and identify what still needs human confirmation before a deal.</p>
-        <div class="dg-chips">
-            <span class="dg-chip" id="dg_chip1">✓ Explicit rule checks</span>
-            <span class="dg-chip" id="dg_chip2">✓ Evidence, not guesswork</span>
-            <span class="dg-chip" id="dg_chip3">✓ Unknown ≠ Safe</span>
+    <!-- One navigation: Prepare → Protect → Debrief. No second numbered journey. -->
+    <nav class="card workflow-navigation" aria-label="Negotiation workflow">
+        <h2 class="card-title" id="sec2_title">Your three-stage decision workspace</h2>
+        <p class="stage-intro" id="workflow_intro">One set of guardrails · One stage input · You control every AI call.</p>
+        <div class="phase-tabs">
+            <button type="button" class="phase-tab active" id="tab_pre_deal" aria-current="step" onclick="setPhase('pre_deal')">
+                <span class="phase-tab-title" id="tab1_t">01 · Prepare — Pre-deal</span>
+                <span class="phase-tab-desc" id="tab1_d">Strategy preparation & reminder draft</span>
+            </button>
+            <button type="button" class="phase-tab" id="tab_in_deal" onclick="setPhase('in_deal')">
+                <span class="phase-tab-title" id="tab2_t">02 · Protect — In-deal</span>
+                <span class="phase-tab-desc" id="tab2_d">Optional speech transcription & tactical review</span>
+            </button>
+            <button type="button" class="phase-tab" id="tab_post_deal" onclick="setPhase('post_deal')">
+                <span class="phase-tab-title" id="tab3_t">03 · Debrief — Post-deal</span>
+                <span class="phase-tab-desc" id="tab3_d">60s Voice Audit vs. Bottom Lines & Follow-Up Email</span>
+            </button>
         </div>
-    </section>
 
-    <section class="dg-panel" id="dealguard_panel" aria-label="DealGuard independent audit">
-        <div class="dg-panel-head">
-            <h2 id="dg_panel_title">01 / Set your deal guardrails</h2>
-            <span class="dg-label" id="dg_no_llm">CHOOSE AI OR RULES-ONLY</span>
+        <div class="session-bar">
+            <div class="session-status">
+                <span id="session_label">🔗 Session Chain:</span>
+                <span id="dot_p1" class="session-dot" style="color:#059669;">⚪ T-15m Wargame</span>
+                <span id="dot_p2" class="session-dot" style="color:#059669;">⚪ Live In-Deal</span>
+                <span id="dot_p3" class="session-dot" style="color:#059669;">⚪ Post-Debrief</span>
+            </div>
+            <button type="button" class="btn-reset" onclick="resetSessionChain()" id="btn_reset_session">🔄 Reset Session Memory</button>
         </div>
-        <p id="dg_panel_desc">Uses the structured settings below and your proposed deal text. Free-text notes are context only; unknown clauses need human review.</p>
+
+
+    </nav>
+
+    <!-- 01 PREPARE: goals, preferences and machine-enforced constraints together -->
+    <section id="stage_prepare" class="stage-pane" aria-label="Prepare goals and guardrails">
+        <div class="card">
+            <h2 class="card-title" id="sec1_title">Commercial goals and decision preferences</h2>
+        <div class="grid-2">
+            <div>
+                <label id="lbl_goal">🎯 Core Goal, Budget & Timeline:</label>
+                <input id="user_goal" value="Close annual compute supply agreement under $1.2M total budget; legal sign-off by Friday." />
+            </div>
+            <div>
+                <label id="lbl_bottom_line">📝 Other deal notes (not machine-enforced):</label>
+                <input id="hard_bottom_line" value="Seller: payment within 45 days; max discount 10%; no exclusivity." />
+            </div>
+        </div>
+        <label id="lbl_risk">📝 User-entered decision preferences & reminders:</label>
+        <input id="risk_preference" value="Require written confirmation, time to review, and no unapproved concessions." />
+        </div>
+
+        <div class="dg-panel" id="dealguard_panel">
+            <div class="dg-panel-head">
+                <h2 id="dg_panel_title">Your deal guardrails</h2>
+                <span class="dg-label" id="dg_no_llm">SHARED ACROSS ALL THREE STAGES</span>
+            </div>
+            <p id="dg_panel_desc">These rules carry into Protect and Debrief. Free-text preferences are advisory context only.</p>
         <div class="dg-config">
             <div><label for="dg_role" id="dg_role_label">Deal perspective</label><select id="dg_role"><option value="seller">Seller · getting paid</option><option value="buyer">Buyer · paying</option><option value="unspecified">Unspecified</option></select></div>
             <div><label for="dg_discount" id="dg_discount_label">Maximum discount (%)</label><input type="number" id="dg_discount" min="0" max="100" value="10"></div>
@@ -964,28 +1002,73 @@ HTML_UI = r"""<!DOCTYPE html>
             <div><label for="dg_pay_days" id="dg_days_label">Payment days threshold</label><input type="number" id="dg_pay_days" min="0" max="3650" value="45"></div>
             <div><label for="dg_no_exclusive" id="dg_exclusive_label">Prohibit exclusivity</label><input type="checkbox" id="dg_no_exclusive" checked></div>
         </div>
-        <p class="dg-notice" id="dg_config_note">These thresholds are the enforced rules. Free-text notes below are not machine-enforced.</p>
-        <label class="dg-step" for="dg_proposal" id="dg_proposal_label">02 / Enter the proposed deal terms</label>
-        <textarea class="dg-proposal" id="dg_proposal" rows="4" maxlength="3500" spellcheck="true"
-            placeholder="Example: Buyer wants 15% discount, net 90-day payment and exclusivity."></textarea>
+            <p class="dg-notice" id="dg_config_note">Only structured thresholds are programmatically enforced.</p>
+        </div>
+    </section>
+
+    <!-- One input, shared across the 3 stages; each stage keeps its draft in memory. -->
+    <section class="card stage-workspace" id="stage_input_workspace" aria-label="Current stage input and controls">
+        <div class="dg-panel-head">
+            <h2 id="dg_proposal_label" class="card-title">Meeting background</h2>
+            <span class="dg-label" id="stage_mode_badge">PREPARE</span>
+        </div>
+        <p class="stage-intro" id="stage_hint">Add fictional meeting context or load an example before requesting a strategy.</p>
+        <label id="lbl_input_text" for="input_text">Your current stage notes</label>
+        <textarea id="input_text" rows="5" maxlength="3500" spellcheck="true"
+            placeholder="Add fictional meeting context…"></textarea>
         <div class="dg-meta-line">
-            <span id="dg_source_note">Only use fictional examples. Redaction cannot guarantee confidentiality.</span>
+            <span id="dg_source_note">Use fictional examples only. Automated redaction cannot guarantee confidentiality.</span>
             <span id="dg_chars">0 / 3500</span>
         </div>
+        <div class="preset-row" id="preset_container"></div>
+        <div class="voice-panel">
+            <div class="voice-header">
+                <label id="lbl_mode" for="voice_lang">Optional speech-to-text (browser-dependent)</label>
+                <select id="voice_lang">
+                    <option value="en-US" id="opt_lang_en">English speech transcription</option>
+                    <option value="zh-CN" id="opt_lang_zh">中文语音转文字</option>
+                </select>
+            </div>
+            <label class="voice-consent" for="mic_consent">
+                <input id="mic_consent" type="checkbox">
+                <span id="mic_consent_text">I have permission to transcribe this conversation. Speech recognition may use a third-party service.</span>
+            </label>
+            <div class="voice-actions">
+                <button type="button" id="mic_btn" class="mic-btn" onclick="toggleMic()">🎙️ Start transcription</button>
+                <span class="voice-status" id="mic_status" role="status" aria-live="polite">Microphone off · transcription only</span>
+            </div>
+            <p class="stage-intro" id="mic_hint">Transcription is voluntary. Pause or stop at any time; it never automatically starts AI analysis.</p>
+        </div>
+        <label class="agent-consent" for="agent_consent">
+            <input id="agent_consent" type="checkbox">
+            <span id="agent_consent_text">I consent to sending sanitized fictional stage notes and decision context to the AI strategy provider.</span>
+        </label>
+        <div class="btn-row">
+            <button type="button" id="run_btn" class="primary" onclick="runAgent()">Generate pre-meeting strategy</button>
+        </div>
+        <p class="dg-action-hint" id="agent_mode_note">The strategy assistant uses a separate AI call, only after you press the button.</p>
+    </section>
+
+    <!-- 02 PROTECT: the same input powers rule-only or source-grounded AI audit. -->
+    <section id="stage_live_audit" class="dg-panel stage-pane" style="display:none" aria-label="In-deal evidence and rules">
+        <div class="dg-panel-head">
+            <h2 id="dg_audit_label">Check the current proposal</h2>
+            <span class="dg-label" id="dg_live_label">EVIDENCE → RULES → ACTION</span>
+        </div>
+        <p class="stage-intro" id="dg_audit_intro">Audit the text above. Your Stage 1 guardrails are reused automatically.</p>
         <div class="dg-actions">
             <button type="button" class="dg-secondary" onclick="loadDealGuardDemo('violation')" id="dg_demo_btn">Load 3-conflict example</button>
             <button type="button" class="dg-secondary" onclick="loadDealGuardDemo('rejected')" id="dg_reject_btn">Load rejected-offer example</button>
         </div>
         <label class="dg-consent" for="dg_consent">
             <input id="dg_consent" type="checkbox"/>
-            <span id="dg_consent_text">I understand that AI mode sends the redacted text to a Gemini provider. Redaction is incomplete; I will use fictional data.</span>
+            <span id="dg_consent_text">I consent to the opt-in Gemini extraction. Redaction is incomplete and this is fictional data.</span>
         </label>
-        <div class="dg-step" id="dg_audit_label">03 / Verify the proposal</div>
         <div class="dg-actions">
-            <button type="button" class="dg-primary" onclick="runHybridAudit()" id="dg_hybrid_btn">✦ AI extraction + rule audit</button>
+            <button type="button" class="dg-primary" onclick="runHybridAudit()" id="dg_hybrid_btn">✦ AI evidence + rule check</button>
             <button type="button" class="dg-secondary" onclick="runDealGuardAudit()" id="dg_check_btn">Rules only · no Gemini</button>
         </div>
-        <p class="dg-action-hint" id="dg_mode_hint">AI mode extracts and quotes clauses. Rules-only is available without an API call.</p>
+        <p class="dg-action-hint" id="dg_mode_hint">Transcription and AI auditing are separate actions; no automatic requests.</p>
         <div id="dg_output" class="dg-output" role="status" aria-live="polite">
             <div class="dg-result-mode" id="dg_mode_used"></div>
             <div class="dg-summary">
@@ -1005,69 +1088,7 @@ HTML_UI = r"""<!DOCTYPE html>
         </div>
     </section>
 
-    <!-- 1. 首席幕僚记忆库 -->
-    <div class="card">
-        <strong class="card-title" id="sec1_title">📂 1. Commercial goals and decision preferences</strong>
-        <div class="grid-2">
-            <div>
-                <label id="lbl_goal">🎯 Core Goal, Budget & Timeline:</label>
-                <input id="user_goal" value="Close annual compute supply agreement under $1.2M total budget; legal sign-off by Friday." />
-            </div>
-            <div>
-                <label id="lbl_bottom_line">📝 Other deal notes (not machine-enforced):</label>
-                <input id="hard_bottom_line" value="Seller: payment within 45 days; max discount 10%; no exclusivity." />
-            </div>
-        </div>
-        <label id="lbl_risk">📝 User-entered decision preferences & reminders:</label>
-        <input id="risk_preference" value="Require written confirmation, time to review, and no unapproved concessions." />
-    </div>
-
-    <!-- 2. 全周期三阶段切换与输入 -->
-    <div class="card">
-        <strong class="card-title" id="sec2_title">🛡️ 2. Three-stage decision support</strong>
-        <div class="phase-tabs">
-            <button type="button" class="phase-tab" id="tab_pre_deal" onclick="setPhase('pre_deal')">
-                <span class="phase-tab-title" id="tab1_t">🕒 Stage 1: T-15m Pre-Deal</span>
-                <span class="phase-tab-desc" id="tab1_d">Strategy preparation & reminder draft</span>
-            </button>
-            <button type="button" class="phase-tab active" id="tab_in_deal" onclick="setPhase('in_deal')">
-                <span class="phase-tab-title" id="tab2_t">⚡ Stage 2: Live In-Deal</span>
-                <span class="phase-tab-desc" id="tab2_d">Optional speech transcription & tactical review</span>
-            </button>
-            <button type="button" class="phase-tab" id="tab_post_deal" onclick="setPhase('post_deal')">
-                <span class="phase-tab-title" id="tab3_t">🎙️ Stage 3: T+0m Debrief</span>
-                <span class="phase-tab-desc" id="tab3_d">60s Voice Audit vs. Bottom Lines & Follow-Up Email</span>
-            </button>
-        </div>
-
-        <div class="session-bar">
-            <div class="session-status">
-                <span id="session_label">🔗 Session Chain:</span>
-                <span id="dot_p1" class="session-dot" style="color:#059669;">⚪ T-15m Wargame</span>
-                <span id="dot_p2" class="session-dot" style="color:#059669;">⚪ Live In-Deal</span>
-                <span id="dot_p3" class="session-dot" style="color:#059669;">⚪ Post-Debrief</span>
-            </div>
-            <button type="button" class="btn-reset" onclick="resetSessionChain()" id="btn_reset_session">🔄 Reset Session Memory</button>
-        </div>
-
-        <div class="preset-row" id="preset_container"></div>
-
-        <label id="lbl_mode">Optional speech transcription (browser-dependent):</label>
-        <select id="voice_lang">
-            <option value="en-US" id="opt_lang_en">🎙️ English transcription (browser-dependent)</option>
-            <option value="zh-CN" id="opt_lang_zh">🎙️ 中文转写（依赖浏览器支持）</option>
-        </select>
-
-        <label id="lbl_input_text">Stage Input (Meeting Context / Live Opponent Speech / 60s Post-Deal Voice Memo):</label>
-        <textarea id="input_text" rows="3"></textarea>
-
-        <div class="btn-row">
-            <button type="button" id="mic_btn" class="mic-btn" onclick="toggleMic()">🎤 启动语音转写（须征得同意）</button>
-            <button type="button" id="run_btn" class="primary" onclick="runAgent()">⚡ Execute Game-Theoretic Engine</button>
-        </div>
-    </div>
-
-    <!-- 3. 动态三元博弈输出区 -->
+    <!-- Existing tactical response output is reused, never duplicated. -->
     <div id="error_box" class="card" style="display:none; border-color:#f87171; background:#fef2f2; color:#b91c1c;"></div>
     <div id="result" class="card" style="display:none;">
         <div class="meta" id="audit_view"></div>
@@ -1103,12 +1124,15 @@ HTML_UI = r"""<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- 4. 博弈论内核、隐私边界与工程迭代证据 -->
+
+    <!-- Technical transparency belongs below the product workflow, not a 'third step'. -->
     <div class="card">
-        <strong class="card-title" id="sec3_title">🔍 3. Architecture, privacy boundaries & tests</strong>
+        <strong class="card-title" id="sec3_title">🔍 How it works · privacy · tests</strong>
         <p style="font-size:13.5px; color:#64748b; margin:8px 0 14px 0;" id="privacy_desc"></p>
         <p class="dg-footnote" id="research_note">The deterministic audit and regression tests are in the public repository. Accuracy, latency and retention claims require independent verification.</p><a href="https://github.com/Serein131/Consigliere-ai" target="_blank" rel="noopener noreferrer">Read tests & source</a>
     </div>
+
+
 
     <script>
         let currentLang = 'en';
