@@ -1315,89 +1315,189 @@ HTML_UI = r"""<!DOCTYPE html>
             document.getElementById('dg_proposal').placeholder=l.proposalPlaceholder;
             document.getElementById('dg_output').style.display='none';
         }
-        function loadDealGuardDemo() {
-            const zh = currentLang === 'zh';
+        // Every displayed quote and status is constructed as text, never injected HTML.
+        function updateDealCharCount() {
+            const el=document.getElementById('dg_proposal');
+            document.getElementById('dg_chars').textContent=el.value.length+' / 3500';
+        }
+        function invalidateDealAudit() {
+            if(dgRequestInFlight)return;
+            document.getElementById('dg_output').style.display='none';
+            document.getElementById('dg_copilot_btn').style.display='none';
+            latestDealAuditMode=null;
+        }
+        function loadDealGuardDemo(kind='violation') {
+            const zh=currentLang==='zh';
             setPhase('in_deal');
-            document.getElementById('hard_bottom_line').value = zh
-                ? '目标：避免超额折扣、过长收款账期和独家合作。'
-                : 'Goal: avoid excessive discounts, long receivable terms and exclusivity.';
             document.getElementById('dg_role').value='seller';
             document.getElementById('dg_discount').value='10';
             document.getElementById('dg_pay_dir').value='maximum';
             document.getElementById('dg_pay_days').value='45';
             document.getElementById('dg_no_exclusive').checked=true;
-            document.getElementById('input_text').value = zh
-                ? '客户要求15%折扣、付款期限30天、独家合作，并希望今天签署。'
-                : 'The customer requires a 15% discount, payment terms 30 days, and an exclusivity agreement signed today.';
+            const proposal=kind==='rejected'
+                ? (zh
+                    ? '买方之前要求15%折扣，但我们已经拒绝；双方同意30天账期，且不接受任何独家合作条款。'
+                    : 'The buyer previously requested a 15% discount, which we rejected. Both sides agreed to net 30 days and no exclusivity.')
+                : (zh
+                    ? '客户要求15%折扣、90天付款期限，并要求签订12个月独家合作协议。'
+                    : 'The buyer requires a 15% discount, payment terms of 90 days, and a 12-month exclusivity agreement.');
+            document.getElementById('dg_proposal').value=proposal;
+            document.getElementById('input_text').value=proposal;
+            updateDealCharCount();
+            invalidateDealAudit();
+            // Auto-running the free rules-only preview never consumes Gemini quota.
             runDealGuardAudit();
         }
         function addAuditFinding(parent, finding, l) {
-            const card=document.createElement('div'); card.className='dg-finding';
+            const card=document.createElement('div');card.className='dg-finding';
             const title=document.createElement('div');title.className='dg-finding-title';
             title.textContent=l.rules[finding.rule] || finding.rule;
-            const st=document.createElement('div');st.className='dg-finding-state '+
-                (finding.status === 'VIOLATION' ? 'violation' : finding.status === 'PASS' ? 'pass' : 'unknown');
-            st.textContent=l.states[finding.status] || 'UNKNOWN';
-            const ev=document.createElement('div');ev.className='dg-finding-evidence';
+            const state=document.createElement('div');
+            state.className='dg-finding-state '+(finding.status==='VIOLATION'?'violation':finding.status==='PASS'?'pass':'unknown');
+            state.textContent=l.states[finding.status] || l.states.UNKNOWN;
+            const evidence=document.createElement('div');evidence.className='dg-finding-evidence';
             const parts=[];
-            if(finding.observed!==undefined)parts.push(l.observed+': '+finding.observed);
-            if(finding.limit!==undefined)parts.push(l.limit+': '+finding.limit);
+            if(finding.observed!==undefined && finding.observed!==null)parts.push(l.observed+': '+finding.observed);
+            if(finding.limit!==undefined && finding.limit!==null)parts.push(l.limit+': '+finding.limit);
             if(finding.minimum!==undefined && finding.minimum!==null)parts.push(l.min+': '+finding.minimum);
             if(finding.maximum!==undefined && finding.maximum!==null)parts.push(l.max+': '+finding.maximum);
-            if(finding.evidence && finding.evidence !== 'Explicit exclusivity language detected.')parts.push(finding.evidence);
+            if(finding.evidence && finding.evidence!=='Explicit exclusivity language detected.')parts.push(finding.evidence);
             if(finding.reason)parts.push(finding.reason);
-            ev.textContent=parts.join(' · ');
-            card.appendChild(title);card.appendChild(st);card.appendChild(ev);parent.appendChild(card);
+            evidence.textContent=parts.join(' · ');
+            card.append(title,state,evidence);parent.appendChild(card);
         }
-        async function runDealGuardAudit() {
-            const l=DG_LABELS[currentLang],output=document.getElementById('dg_output'),
-                status=document.getElementById('dg_status'),
-                counter=document.getElementById('dg_counter'),
-                findings=document.getElementById('dg_findings'),
-                btn=document.getElementById('dg_check_btn');
-            output.style.display='block';findings.replaceChildren();counter.textContent='';
-            const text=document.getElementById('input_text').value;
-            const rules=document.getElementById('hard_bottom_line').value;
-            if(!text.trim()){
-                status.className='dg-status unknown';status.textContent=l.missing;return;
+        function renderExtractedTerms(payload, l) {
+            const box=document.getElementById('dg_evidence');
+            const parent=document.getElementById('dg_extracted_terms');
+            parent.replaceChildren();
+            const terms=payload.extraction && Array.isArray(payload.extraction.terms)
+                ?payload.extraction.terms:[];
+            box.style.display=terms.length?'block':'none';
+            terms.forEach(term=>{
+                const item=document.createElement('div');item.className='dg-term';
+                const heading=document.createElement('strong');
+                heading.textContent=l.termFields[term.field]||term.field;
+                const subtitle=document.createElement('em');
+                subtitle.textContent=(l.sourceStatuses[term.source_status]||term.source_status||l.unknown)
+                    +(term.value!==null && term.value!==undefined?' · '+term.value+
+                     (term.field==='discount'?'%':term.field==='payment'?(currentLang==='zh'?' 天':' days'):''):'');
+                const evidence=document.createElement(term.quote_verified?'q':'div');
+                if(!term.quote_verified)evidence.className='dg-unverified';
+                evidence.textContent=term.quote_verified?term.evidence:l.quoteUnverified;
+                item.append(heading,subtitle,evidence);parent.appendChild(item);
+            });
+        }
+        function renderDealAudit(payload, mode) {
+            const l=DG_LABELS[currentLang];
+            const audit=mode==='hybrid'?payload.audit:payload;
+            if(!audit || !Array.isArray(audit.findings))throw new Error('Malformed audit result');
+            const state=audit.assessment||'UNKNOWN';
+            const status=document.getElementById('dg_status');
+            status.className='dg-status '+(state==='VIOLATION'?'violation':state==='NO_DETECTED_VIOLATION'?'pass':'unknown');
+            status.textContent=state==='VIOLATION'?l.violation:state==='NO_DETECTED_VIOLATION'?l.pass:l.unknown;
+            document.getElementById('dg_counter').textContent=(audit.configured_checks||0)+' '+l.checks+' · '+
+                (audit.violation_count||0)+' '+l.failures;
+            document.getElementById('dg_mode_used').textContent=mode==='hybrid'
+                ?l.modeHybrid+' · '+(payload.model_used||'Gemini')+' · '+(payload.elapsed_ms||0)+' ms'
+                :l.modeRules;
+            const findings=document.getElementById('dg_findings');
+            findings.replaceChildren();
+            audit.findings.forEach(f=>addAuditFinding(findings,f,l));
+            if(mode==='hybrid')renderExtractedTerms(payload,l);
+            else{
+                document.getElementById('dg_extracted_terms').replaceChildren();
+                document.getElementById('dg_evidence').style.display='none';
             }
-            btn.disabled=true;status.className='dg-status unknown';status.textContent=l.pending;
+            const risks=audit.commercial_risks||[];
+            const riskBox=document.getElementById('dg_risk');
+            const riskContent=document.getElementById('dg_risk_findings');
+            riskContent.replaceChildren();
+            riskBox.style.display=risks.length?'block':'none';
+            risks.forEach(r=>{
+                const item=document.createElement('p');
+                item.textContent=(l.risks[r.code]||r.code)+(r.evidence?' · '+r.evidence:'')+
+                    ' — '+l.reviewText;
+                riskContent.appendChild(item);
+            });
+            const warnings=audit.rule_warnings||[];
+            document.getElementById('dg_rule_warnings').textContent=
+                warnings.length?l.warningPrefix+warnings.join('; '):'';
+            document.getElementById('dg_copilot_btn').style.display='inline-block';
+            latestDealAuditMode=mode;
+        }
+        function validateDealInput(mode) {
+            const l=DG_LABELS[currentLang];
+            const raw=document.getElementById('dg_proposal').value.trim();
+            if(!raw)return l.missing;
+            if(raw.length>3500)return l.tooLong;
+            const rules=getStructuredRules();
+            const discount=document.getElementById('dg_discount').value;
+            const days=document.getElementById('dg_pay_days').value;
+            if(discount!=='' && (!Number.isFinite(rules.discount_max_pct) || rules.discount_max_pct<0 || rules.discount_max_pct>100))return l.invalidSettings;
+            if(rules.payment_direction && (days==='' || rules.payment_days<0 || rules.payment_days>3650 || !Number.isFinite(rules.payment_days)))return l.invalidSettings;
+            if(discount==='' && rules.payment_direction===null && !rules.prohibit_exclusivity)return l.invalidSettings;
+            if(mode==='hybrid' && !document.getElementById('dg_consent').checked)return l.giveConsent;
+            return '';
+        }
+        async function runDealAudit(mode) {
+            if(dgRequestInFlight)return;
+            const l=DG_LABELS[currentLang];
+            const output=document.getElementById('dg_output'),status=document.getElementById('dg_status');
+            output.style.display='block';
+            document.getElementById('dg_findings').replaceChildren();
+            document.getElementById('dg_extracted_terms').replaceChildren();
+            document.getElementById('dg_evidence').style.display='none';
+            document.getElementById('dg_risk').style.display='none';
+            document.getElementById('dg_copilot_btn').style.display='none';
+            document.getElementById('dg_counter').textContent='';
+            document.getElementById('dg_rule_warnings').textContent='';
+            document.getElementById('dg_mode_used').textContent='';
+            const invalid=validateDealInput(mode);
+            if(invalid){
+                status.className='dg-status unknown';status.textContent=invalid;return;
+            }
+            dgRequestInFlight=true;
+            const hybridBtn=document.getElementById('dg_hybrid_btn');
+            const ruleBtn=document.getElementById('dg_check_btn');
+            hybridBtn.disabled=true;ruleBtn.disabled=true;
+            status.className='dg-status unknown';
+            status.textContent=mode==='hybrid'?l.processing:l.pending;
+            const controller=new AbortController();
+            const clock=setTimeout(()=>controller.abort(),mode==='hybrid'?29000:11000);
             try{
-                // Identifiers are masked with the same client-side helper as the three-stage app.
-                const body={text:clientSideRedact(text).sanitizedText,
-                    hard_bottom_line:clientSideRedact(rules).sanitizedText,
-                    structured_rules:getStructuredRules()};
-                const res=await fetch('/audit',{method:'POST',
-                    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-                const result=await res.json();
-                if(!res.ok || result.error)throw new Error(result.error || 'HTTP '+res.status);
-                const state=result.assessment || 'UNKNOWN';
-                status.className='dg-status '+(state==='VIOLATION'?'violation':
-                    state==='NO_DETECTED_VIOLATION'?'pass':'unknown');
-                status.textContent=state==='VIOLATION'?l.violation:
-                    state==='NO_DETECTED_VIOLATION'?l.pass:l.unknown;
-                counter.textContent=(result.configured_checks || 0)+' '+l.checks+' · '+
-                    (result.violation_count || 0)+' '+l.failures;
-                (result.findings || []).forEach(f=>addAuditFinding(findings,f,l));
-                const commercial=document.getElementById('dg_risk'),
-                    commercialFindings=document.getElementById('dg_risk_findings');
-                commercialFindings.replaceChildren();
-                const risks=result.commercial_risks || [];
-                commercial.style.display=risks.length?'block':'none';
-                risks.forEach(r=>{
-                    const paragraph=document.createElement('p');
-                    paragraph.textContent=(l.risks[r.code] || r.code)+
-                        (r.evidence?' · '+r.evidence:'')+' — '+
-                        (l.reviewText || 'Review separately');
-                    commercialFindings.appendChild(paragraph);
+                const payload={
+                    text:clientSideRedact(document.getElementById('dg_proposal').value).sanitizedText,
+                    structured_rules:getStructuredRules()
+                };
+                if(mode==='hybrid')payload.consent_to_model_processing=true;
+                const response=await fetch(mode==='hybrid'?'/hybrid-audit':'/audit',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(payload),signal:controller.signal
                 });
-                const warnings=(result.rule_warnings || []);
-                document.getElementById('dg_rule_warnings').textContent=
-                    warnings.length?l.warningPrefix+warnings.join('; '):'';
-            }catch(err){
-                status.className='dg-status violation';
-                status.textContent=l.error+err.message;
-            }finally{btn.disabled=false;}
+                let data;
+                try{data=await response.json();}catch(e){throw new Error('HTTP '+response.status);}
+                if(!response.ok || data.error)throw new Error(l.errorCodes[data.error]||data.error||'HTTP '+response.status);
+                renderDealAudit(data,mode);
+            }catch(e){
+                status.className='dg-status unknown';
+                status.textContent=e.name==='AbortError'?l.failedInput:l.error+e.message;
+                document.getElementById('dg_mode_used').textContent=mode==='hybrid'?l.modeHybrid:l.modeRules;
+            }finally{
+                clearTimeout(clock);
+                dgRequestInFlight=false;
+                hybridBtn.disabled=false;ruleBtn.disabled=false;
+            }
+        }
+        function runDealGuardAudit(){return runDealAudit('rules');}
+        function runHybridAudit(){return runDealAudit('hybrid');}
+        function sendProposalToCopilot(){
+            const proposal=document.getElementById('dg_proposal').value;
+            if(!proposal.trim())return;
+            setPhase('in_deal');
+            document.getElementById('input_text').value=proposal;
+            const stage=document.getElementById('input_text');
+            stage.scrollIntoView({behavior:'smooth',block:'center'});
+            stage.focus({preventScroll:true});
         }
 
         function setPhase(phase) {
