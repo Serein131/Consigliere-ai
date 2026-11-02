@@ -1,0 +1,51 @@
+name: Gemini Baseline Comparison (opt-in)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/gemini-baseline-ci
+permissions:
+  contents: read
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check Gemini authentication without revealing credentials
+        id: credentials
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Gemini API secret is available."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No GEMINI_API_KEY repository secret exists. Generic Gemini was NOT run."
+          fi
+      - name: Execute actual Gemini baseline on the same synthetic cases
+        if: steps.credentials.outputs.available == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.5-flash-lite
+        run: |
+          python research/run_gemini_baseline.py --limit 10 --sleep 1
+          python research/run_gemini_baseline.py --limit 60 --sleep 1
+          python research/evaluate.py --baseline-predictions research/baseline_predictions.json --output research/gemini_baseline_report.md --json research/gemini_baseline_report.json
+          python research/evaluate.py --output research/dealguard_baseline_report.md --json research/dealguard_baseline_report.json
+      - name: Upload measured model results if present
+        if: steps.credentials.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemini-vs-dealguard-measured
+          path: |
+            research/baseline_predictions.json
+            research/gemini_baseline_report.md
+            research/gemini_baseline_report.json
+            research/dealguard_baseline_report.md
+            research/dealguard_baseline_report.json
+          if-no-files-found: warn
+          retention-days: 30
