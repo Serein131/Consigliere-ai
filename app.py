@@ -92,6 +92,22 @@ def call_gemini_rest(api_key: str, model_name: str, system_instruction: str, use
     finally:
         conn.close()
 
+@app.route("/audit", methods=["POST"])
+def audit_only():
+    """Deterministic demo: no Gemini call; unsupported/missing terms remain UNKNOWN."""
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Expected a JSON object"}), 400
+    text = str(payload.get("text") or "")[:12000]
+    rules = str(payload.get("hard_bottom_line") or "")[:2000]
+    if not text.strip() or not rules.strip():
+        return jsonify({"error": "Both text and hard_bottom_line are required."}), 400
+    # Percentages / durations must remain measurable; identifiers and money are scrubbed.
+    return jsonify(check_deal(
+        server_fallback_redact(text)["sanitized_text"],
+        server_fallback_redact(rules)["sanitized_text"]
+    ))
+
 @app.route("/analyze", methods=["POST"])
 def analyze_negotiation():
     start_time = time.perf_counter()
