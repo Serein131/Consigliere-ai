@@ -1,8 +1,8 @@
-name: Gemini Baseline Comparison (manual API run)
+name: Gemini 60-Case Full Research Experiment
 # Diagnostic rerun: normalize accidental whitespace around the protected key
 on:
   push:
-    branches: [main]
+    branches: [experiment/gemini-full-sixty-20261102]
     paths:
       - '.github/workflows/gemini-baseline.yml'
   workflow_dispatch:
@@ -44,13 +44,13 @@ jobs:
           GEMINI_MODEL: gemini-3.5-flash-lite
         run: python research/diagnose_gemini.py
       - name: Run real Gemini-only baseline (quota or charges may apply)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'push'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.5-flash-lite
-          SAMPLE_SIZE: ${{ inputs.sample_size || '1' }}
+          SAMPLE_SIZE: '60'
         run: |
-          python research/run_gemini_baseline.py --limit "$SAMPLE_SIZE" --sleep 2
+          python research/run_gemini_baseline.py --limit "$SAMPLE_SIZE" --sleep 3
           python - <<'PY'
           import json,os,pathlib,sys
           path=pathlib.Path("research/baseline_predictions.json")
@@ -63,14 +63,14 @@ jobs:
           print(f"Gemini predicted all {observed} synthetic cases.")
           PY
       - name: Score ordinary Gemini versus deterministic DealGuard on paired cases
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'push'
         env:
-          SAMPLE_SIZE: ${{ inputs.sample_size || '1' }}
+          SAMPLE_SIZE: '60'
         run: |
           python research/evaluate.py --limit "$SAMPLE_SIZE" --baseline-predictions research/baseline_predictions.json --output research/gemini_baseline_report.md --json research/gemini_baseline_report.json
           python research/evaluate.py --limit "$SAMPLE_SIZE" --output research/dealguard_paired_report.md --json research/dealguard_paired_report.json
       - name: Upload real model predictions and paired reports
-        if: github.event_name == 'workflow_dispatch' && success()
+        if: github.event_name == 'push' && success()
         uses: actions/upload-artifact@v4
         with:
           name: measured-gemini-vs-dealguard
