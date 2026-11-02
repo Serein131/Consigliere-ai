@@ -1400,6 +1400,8 @@ HTML_UI = r"""<!DOCTYPE html>
             auditInputRevision += 1;
             document.getElementById('dg_output').style.display='none';
             document.getElementById('dg_copilot_btn').style.display='none';
+            document.getElementById('result').style.display='none';
+            latestTacticalOutput=null;
             latestDealAuditMode=null;
         }
         function loadDealGuardDemo(kind='violation') {
@@ -2144,7 +2146,8 @@ HTML_UI = r"""<!DOCTYPE html>
             setLanguage(sysLang.startsWith('en')?'en':'zh');
             const editor=document.getElementById('input_text');
             editor.addEventListener('input',()=>{updateDealCharCount();invalidateDealAudit();});
-            ['dg_role','dg_discount','dg_pay_dir','dg_pay_days','dg_no_exclusive'].forEach(id=>{
+            ['dg_role','dg_discount','dg_pay_dir','dg_pay_days','dg_no_exclusive',
+             'user_goal','hard_bottom_line','risk_preference'].forEach(id=>{
                 const element=document.getElementById(id);
                 element.addEventListener('input',invalidateDealAudit);
                 element.addEventListener('change',invalidateDealAudit);
