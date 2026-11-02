@@ -5,6 +5,7 @@ on:
       - feature/four-arm-research-portfolio-20261102
     paths:
       - '.github/workflows/four-arm-research.yml'
+      - 'research/run_four_arms.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -56,11 +57,11 @@ jobs:
         run: |
           python research/run_four_arms.py --cases "$CASES" --arm gemini --sleep 7 --output research/arm_outputs/gemini.json
       - name: D - Evidence-grounded Gemini extraction and deterministic audit
-        if: steps.credentials.outputs.gemini == 'true'
+        if: always() && steps.credentials.outputs.gemini == 'true' && steps.bootstrap.outcome == 'success'
         run: |
           python research/run_four_arms.py --cases "$CASES" --arm hybrid --sleep 7 --output research/arm_outputs/hybrid.json
       - name: B - Direct OpenAI GPT on identical rule task
-        if: steps.credentials.outputs.openai == 'true'
+        if: always() && steps.credentials.outputs.openai == 'true' && steps.bootstrap.outcome == 'success'
         run: |
           python research/run_four_arms.py --cases "$CASES" --arm gpt --sleep 3 --output research/arm_outputs/gpt.json
       - name: Score actual completed arms (NOT_RUN for unavailable providers)
