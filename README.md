@@ -34,13 +34,14 @@ User-defined goals + structured deal rules
 
 The current regex-based engine matched **60/60 familiar development examples** after targeted fixes, but only **16/40 new difficult synthetic cases**, while a plain Gemini API benchmark matched **31/40** on those same new cases. The result exposes a generalization problem and motivates the hybrid architecture.
 
-These are fictional AI-assisted scenarios with **non-independent labels**. They are *not* validated contract accuracy or proof that one provider universally wins. The next [four-group benchmark](research/BENCHMARK.md) tests Gemini, an OpenAI GPT model, deterministic DealGuard, and the evidence-grounded hybrid. Only actually executed model groups will receive measured scores.
+These are fictional AI-assisted scenarios with **non-independent labels**. They are *not* validated contract accuracy or proof that one provider universally wins. A new [24-case four-arm experimental framework](research/FOUR_ARM_RESULTS.md) has **three actually completed groups**: Gemini 21/24, deterministic DealGuard 11/24, and evidence-grounded hybrid 22/24 exact matches against authored synthetic labels. The OpenAI GPT group remains **NOT_RUN** pending API authorization. The hybrid is a research module, not a deployed production release. These numbers are not expert-validated accuracy and the hybrid's one-case advantage over Gemini is not conclusive.
 
 ## Repository guide
 
 | Entry | Purpose |
 |---|---|
-| [research/BENCHMARK.md](research/BENCHMARK.md) | Results, comparison design and honest limitations |
+| [research/BENCHMARK.md](research/BENCHMARK.md) | Research overview, historical reversals and study design |
+| [research/FOUR_ARM_RESULTS.md](research/FOUR_ARM_RESULTS.md) | **Latest actual three completed groups**, GPT marked NOT_RUN, full case failures |
 | [research/EVALUATION.md](research/EVALUATION.md) | Scoring rules, reproducibility and four-arm methodology |
 | [research/cases/](research/cases/) | Synthetic case catalog (familiar, challenging, frozen) |
 | [research/user_test_protocol.md](research/user_test_protocol.md) | Consent-based 5–8 minute usability test plan |
