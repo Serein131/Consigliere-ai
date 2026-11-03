@@ -214,7 +214,7 @@ def extract_term_mentions(text):
         # Supplemental recognition for common word orders not handled by the
         # rules-only engine. This is display-only and NEVER changes a verdict.
         if not payment:
-            alt = re.search(r"(\d{1,4})\s*天\s*付款|\bpayment\s+in\s+(\d{1,4})\s*days?\b",clause,re.I)
+            alt = re.search(r"(\d{1,4})\s*天(?:内)?\s*付款|\bpayment\s+in\s+(\d{1,4})\s*days?\b",clause,re.I)
             if alt:
                 val = int(alt.group(1) or alt.group(2))
                 payment = [{"observed":val,"evidence":alt.group(0)}] if val<=3650 else []
