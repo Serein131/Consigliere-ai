@@ -1349,7 +1349,7 @@ HTML_UI = r"""<!DOCTYPE html>
             zh: {
                 kicker:'CONSIGLIERE AI · 创始人谈判决策助手',
                 headline:'谈判前准备 · 谈判中守护 · 谈判后复盘',
-                hero:'一次设定交易底线，战中核查证据，战后整理承诺与跟进事项。每次分析都由你主动触发。',
+                hero:'一次设定交易底线，战中核查证据，战后整理承诺。可手动分析，或明确授权后在前台自动提示。',
                 chip1:'✓ 明确规则校验',chip2:'✓ 可核查证据',chip3:'✓ 未知不等于安全',
                 panel:'本次交易底线',label:'三阶段共同使用',
                 desc:'只需设置一次明确底线，谈判中与谈判后沿用；备注只作背景，不是机器强制规则。',
@@ -1836,8 +1836,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 ?'我已获得适用的语音转写许可，理解浏览器语音识别可能由第三方处理。'
                 :'I have permission to transcribe this conversation. Browser speech recognition may use third-party services.';
             document.getElementById('mic_hint').textContent=lang==='zh'
-                ?'语音仅转为文字，随时可以停止；停顿或停止不会自动调用 Gemini。'
-                :'Speech is converted to text only. Pause or stop anytime; no AI call happens automatically.';
+                ?'录音需要主动开启；仅在另外开启 Live Assist 后，完整语音片段才会自动检测。停顿和停止本身不触发分析。'
+                :'Start transcription manually. Only separately enabled Live Assist checks finalized speech automatically; pause and stop never trigger analysis.';
             document.getElementById('agent_consent_text').textContent=lang==='zh'
                 ?'我同意将脱敏后的虚构阶段文本及决策背景发送至 AI 策略服务（脱敏不保证完整）。'
                 :'I consent to sending masked fictional stage notes and decision context to the AI strategy provider; masking is incomplete.';
