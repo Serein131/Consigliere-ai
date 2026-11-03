@@ -356,7 +356,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v5.3 | Prepare · Protect · Debrief</title>
+    <title>Consigliere AI v5.4 | Prepare · Protect · Debrief</title>
     <style>
         :root {
             --bg-canvas: #f8fafc;
@@ -957,12 +957,30 @@ HTML_UI = r"""<!DOCTYPE html>
           .dg-findings{grid-template-columns:1fr}
           .dg-actions button{flex:1;min-width:140px}
         }
+    
+        /* Live Assist is a deliberate, short-lived foreground session. */
+        .live-panel {border:1.5px solid #99d9c8;background:#f0fdfa;border-radius:13px;padding:16px 18px;margin:16px 0}
+        .live-panel h3 {font-size:16px;color:#115e59;margin:0 0 7px}
+        .live-panel p {font-size:12.5px;color:#365b58;margin:6px 0}
+        .live-controls {display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:11px 0}
+        .live-controls select {width:auto;max-width:100%;font-size:13px;padding:8px}
+        .live-controls button {width:auto;font-size:13px;padding:10px 15px;margin:0}
+        .live-consent {display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.5}
+        .live-consent input {width:18px;height:18px;flex-shrink:0;margin:2px 0 0}
+        .live-state {font-size:12px;font-weight:700;color:#0f766e}
+        .live-alerts {display:none;border:1px solid #fbbf24;background:#fffdf1;border-radius:10px;padding:12px;margin-top:11px}
+        .live-alerts.risk {border-color:#fca5a5;background:#fff7f7}
+        .live-alerts.neutral {border-color:#cbd5e1;background:#ffffff}
+        .live-alerts strong {display:block;font-size:13px;margin-bottom:5px}
+        .live-alerts p {margin:6px 0;overflow-wrap:anywhere}
+        .live-alerts .live-quote {border-left:2px solid #cbd5e1;padding-left:8px;font-size:12px;color:#475569}
+        @media(max-width:680px){.live-controls{align-items:stretch;flex-direction:column}.live-controls button,.live-controls select{width:100%}}
     </style>
 </head>
 <body>
     <div class="header-row">
         <div>
-            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.3 · Unified Negotiation Agent</span></div>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.4 · Consent-Based Live Assist</span></div>
             <div class="subtitle" id="subtitle_text">Set limits · Verify terms · Explore options</div>
         </div>
         <div class="lang-switch">
@@ -1102,6 +1120,26 @@ HTML_UI = r"""<!DOCTYPE html>
             <span class="dg-label" id="dg_live_label">EVIDENCE → RULES → ACTION</span>
         </div>
         <p class="stage-intro" id="dg_audit_intro">Audit the text above. Your Stage 1 guardrails are reused automatically.</p>
+
+        <div id="live_assist_panel" class="live-panel" aria-label="Consent-based Live Assist">
+            <h3 id="live_title">⚡ Live Assist · opt-in risk alerts</h3>
+            <p id="live_intro">Start a foreground session to check newly typed terms or completed speech transcripts automatically. Nothing is analyzed until you opt in.</p>
+            <label class="live-consent" for="live_consent">
+                <input type="checkbox" id="live_consent">
+                <span id="live_consent_text">I consent to automatically sending masked fictional text to this app's server while Live Assist is on. Masking is imperfect; I may stop anytime.</span>
+            </label>
+            <div class="live-controls">
+                <label for="live_mode" id="live_mode_label">Automatic audit</label>
+                <select id="live_mode" aria-label="Automatic audit mode">
+                    <option value="rules" id="live_opt_rules">Rules only · no Gemini</option>
+                    <option value="hybrid" id="live_opt_hybrid">Gemini evidence + rules · separate AI consent required</option>
+                </select>
+                <button type="button" class="dg-primary" id="live_toggle" onclick="toggleLiveAssist()">Start Live Assist</button>
+            </div>
+            <p id="live_ai_notice">AI mode additionally requires the Gemini processing checkbox below. Rule mode runs on this app's server; neither mode is offline or guaranteed real-time.</p>
+            <div class="live-state" id="live_state" role="status" aria-live="polite">Off · no automatic audits</div>
+            <div class="live-alerts" id="live_alerts" role="status" aria-live="polite"></div>
+        </div>
         <div class="dg-actions">
             <button type="button" class="dg-secondary" onclick="loadDealGuardDemo('violation')" id="dg_demo_btn">Load 3-conflict example</button>
             <button type="button" class="dg-secondary" onclick="loadDealGuardDemo('rejected')" id="dg_reject_btn">Load rejected-offer example</button>
@@ -1191,6 +1229,8 @@ HTML_UI = r"""<!DOCTYPE html>
         let stageDrafts = {pre_deal:'', in_deal:'', post_deal:''};
         let languageInitialized = false;
         let auditInputRevision = 0;
+        const liveAssist = {active:false, timer:null, controller:null, sequence:0,
+            lastSignature:'',lastSentAt:0,lastFinalTranscript:''};
         let activeAgentRequestPhase = null;
         let audioStream = null;
         let silenceTimer = null;
@@ -1396,13 +1436,14 @@ HTML_UI = r"""<!DOCTYPE html>
             const el=document.getElementById('input_text');
             document.getElementById('dg_chars').textContent=el.value.length+' / 3500';
         }
-        function invalidateDealAudit() {
+        function invalidateDealAudit(allowLiveSchedule=true) {
             auditInputRevision += 1;
             document.getElementById('dg_output').style.display='none';
             document.getElementById('dg_copilot_btn').style.display='none';
             document.getElementById('result').style.display='none';
             latestTacticalOutput=null;
             latestDealAuditMode=null;
+            if(liveAssist.active)invalidateLiveAlert(allowLiveSchedule);
         }
         function loadDealGuardDemo(kind='violation') {
             // Explicit user action only: load fictional text, do NOT call either model.
@@ -1593,7 +1634,7 @@ HTML_UI = r"""<!DOCTYPE html>
                     input:'Current offer, chat excerpt or live transcript',
                     placeholder:'Buyer requests 15% discount, net 90 days and exclusivity…',
                     action:'Generate tactical counter-question',
-                    note:'Audit the same text below, then optionally request a separate AI response. No automatic model calls.'
+                    note:'Run a manual audit, or start consent-based Live Assist for automatic foreground alerts. Strategy requests remain manual.'
                 },
                 post_deal:{
                     badge:'03 · DEBRIEF',title:'Post-meeting notes / voice memo',
@@ -1619,7 +1660,7 @@ HTML_UI = r"""<!DOCTYPE html>
                     input:'当前报价、聊天片段或谈判转写',
                     placeholder:'买方要求15%折扣、90天付款，以及12个月独家合作……',
                     action:'生成当场反问和谈判建议',
-                    note:'在下方用相同文本核验底线，再自主选择生成策略；不自动调用模型。'
+                    note:'可手动核验，或在独立授权后启动 Live Assist 前台提醒；策略建议仍需手动触发。'
                 },
                 post_deal:{
                     badge:'03 · 谈判后',title:'谈判复盘 / 60秒口述',
@@ -1662,12 +1703,14 @@ HTML_UI = r"""<!DOCTYPE html>
             updateSessionUI();
             updateDealCharCount();
             if(typeof updateMicUI==='function')updateMicUI();
+            updateLiveUI();
         }
 
         function setPhase(phase) {
             if(!['pre_deal','in_deal','post_deal'].includes(phase))return;
             // Stopping transcription on navigation never invokes model inference.
             if(isListening)stopMicInternal();
+            if(liveAssist.active && phase!=='in_deal')stopLiveAssist();
             const editor=document.getElementById('input_text');
             stageDrafts[currentPhase]=editor.value;
             currentPhase=phase;
@@ -1706,6 +1749,7 @@ HTML_UI = r"""<!DOCTYPE html>
         }
 
         function resetSessionChain() {
+            if(liveAssist.active)stopLiveAssist();
             sessionMemory = { pre_deal: null, in_deal: null, post_deal: null };
             updateSessionUI();
             alert(currentLang === 'zh' ? '会话链路记忆已清空重置。' : 'Session memory chain has been reset.');
@@ -1752,7 +1796,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('btn_mail_client').innerText = "✉️ 唤起本地邮件客户端";
 
                 document.getElementById('sec3_title').innerText = "🔍 工作原理、隐私与测试";
-                document.getElementById('privacy_desc').textContent = '本工具仅辅助决策。语音转文字必须主动开启，不会自动触发 AI 分析。浏览器语音识别可能调用外部服务；正则脱敏不完整。仅使用虚构数据并取得适用的录音许可。';
+                document.getElementById('privacy_desc').textContent = '本工具仅辅助决策。语音转写及 Live Assist 分别按需授权；Live Assist 开启后才会自动检查完整发言。浏览器语音识别可能调用外部服务；脱敏不完整。仅使用虚构数据并取得适用许可。';
             } else {
                 document.getElementById('subtitle_text').innerText = "Prepare · Protect · Debrief";
                 document.getElementById('sec1_title').innerText = "🎯 Goals, preferences and reminders";
@@ -1866,8 +1910,202 @@ HTML_UI = r"""<!DOCTYPE html>
             btn.textContent=isListening?(zh?'■ 停止语音转写':'■ Stop transcription')
                 :(zh?'🎙️ 开始语音转写':'🎙️ Start transcription');
             status.textContent=message || (isListening
-                ?(zh?'麦克风已开启 · 只转写，不自动分析':'Microphone on · text only, no auto-analysis')
-                :(zh?'麦克风已关闭 · 请主动点击分析':'Microphone off · press Analyze when ready'));
+                ?(liveAssist.active?(zh?'转写中 · Live Assist 已获授权检查完整语句':'Transcribing · Live Assist can check finalized phrases')
+                    :(zh?'麦克风已开启 · 仅转写，不自动分析':'Microphone on · transcription only'))
+                :(zh?'麦克风关闭 · 可手动输入':'Microphone off · type terms or begin transcription'));
+        }
+
+
+        // v5.4: opt-in foreground monitoring. Default mode is rules-only; Gemini is
+        // NEVER called without a separate processing consent. All mode changes,
+        // navigation and page backgrounding stop the monitoring session.
+        const LIVE_COPY = {
+            en:{start:'Start Live Assist',stop:'■ Stop Live Assist',
+                off:'Off · no automatic audits',activeRules:'Active · rules only (server)',
+                activeAI:'Active · Gemini + evidence checks',needConsent:'Confirm Live Assist processing consent first.',
+                needAI:'Select the separate Gemini processing consent below first.',
+                waiting:'Waiting for fictional deal text…',checking:'Checking latest completed text…',
+                pending:'Waiting for a completed phrase or text edit…',
+                paused:'Session stopped. No automatic analysis.',
+                violation:'⚠ Rule conflict detected',unknown:'Needs verification · unknown is not safe',
+                clear:'No detected violation · not a safety guarantee',
+                error:'Automatic check failed. Manual auditing is still available.',
+                counter:'Before agreeing, ask: Can we revisit this term and confirm the conditions in writing?',
+                modeRules:'Rules only · no Gemini',
+                modeAI:'Gemini evidence + rules · extra consent needed',
+                intro:'Choose an automatic mode, explicitly start a foreground session, then type or voluntarily transcribe. No background listening.',
+                title:'⚡ Live Assist · opt-in risk alerts',
+                consent:'I consent to automatic transmission of masked fictional text to this app server while Live Assist is on. Masking is incomplete; I may stop anytime.',
+                aiNotice:'Gemini mode additionally requires the Gemini processing checkbox below. Rules mode also uses this app server; neither mode is offline.',
+                modeLabel:'Automatic audit'},
+            zh:{start:'启动 Live Assist',stop:'■ 停止 Live Assist',
+                off:'关闭 · 不会自动分析',activeRules:'已开启 · 服务端规则检测',
+                activeAI:'已开启 · Gemini 证据核验',needConsent:'请先单独确认 Live Assist 自动处理授权。',
+                needAI:'请先勾选下方 Gemini 数据处理授权。',
+                waiting:'等待输入虚构交易条件……',checking:'正在检查最新完整文本……',
+                pending:'等待完整发言或文字编辑……',
+                paused:'已停止会话，不再自动分析。',
+                violation:'⚠ 发现底线冲突',unknown:'需要核实 · 未知不代表安全',
+                clear:'未识别规则冲突 · 并非交易安全保证',
+                error:'自动核验失败；仍可使用手动审计。',
+                counter:'同意前建议追问：这一条能否重新协商，并以书面明确条件？',
+                modeRules:'仅规则检测 · 不调用 Gemini',
+                modeAI:'Gemini 证据与规则 · 须额外授权',
+                intro:'选择模式并明确开启前台会话，再手动输入或主动录音。不会在后台持续监听。',
+                title:'⚡ Live Assist · 主动风险提醒',
+                consent:'我同意 Live Assist 开启期间将脱敏后的虚构文本自动发送至本站服务器。脱敏不完整，可随时停止。',
+                aiNotice:'Gemini 模式还需勾选下方单独 AI 授权。规则模式同样使用本站服务器；两者都不是离线模式。',
+                modeLabel:'自动检测模式'}
+        };
+        function liveTextForAudit(){
+            const editor=document.getElementById('input_text');
+            // Interim speech hypotheses remain visible to the user but are not sent.
+            if(isListening && micStartPhase==='in_deal')
+                return (speechBaseText+liveAssist.lastFinalTranscript).trim();
+            return editor.value.trim();
+        }
+        function liveFingerprint(){
+            return JSON.stringify({text:liveTextForAudit(),mode:document.getElementById('live_mode').value,
+                rules:getStructuredRules()});
+        }
+        function clearLiveTimerAndRequest(){
+            if(liveAssist.timer!==null){clearTimeout(liveAssist.timer);liveAssist.timer=null;}
+            if(liveAssist.controller){liveAssist.controller.abort();liveAssist.controller=null;}
+            liveAssist.sequence+=1;
+        }
+        function updateLiveUI(message){
+            const l=LIVE_COPY[currentLang];
+            document.getElementById('live_title').textContent=l.title;
+            document.getElementById('live_intro').textContent=l.intro;
+            document.getElementById('live_consent_text').textContent=l.consent;
+            document.getElementById('live_mode_label').textContent=l.modeLabel;
+            document.getElementById('live_opt_rules').textContent=l.modeRules;
+            document.getElementById('live_opt_hybrid').textContent=l.modeAI;
+            document.getElementById('live_ai_notice').textContent=l.aiNotice;
+            document.getElementById('live_toggle').textContent=liveAssist.active?l.stop:l.start;
+            document.getElementById('live_state').textContent=message||(liveAssist.active
+                ?(document.getElementById('live_mode').value==='hybrid'?l.activeAI:l.activeRules):l.off);
+        }
+        function clearLiveFindings(){
+            const box=document.getElementById('live_alerts');
+            box.style.display='none';
+            box.replaceChildren();
+        }
+        function stopLiveAssist(message){
+            clearLiveTimerAndRequest();
+            liveAssist.active=false;
+            liveAssist.lastSignature='';
+            liveAssist.lastFinalTranscript='';
+            clearLiveFindings();
+            updateLiveUI(message||LIVE_COPY[currentLang].paused);
+            if(typeof updateMicUI==='function')updateMicUI();
+        }
+        function toggleLiveAssist(){
+            if(liveAssist.active){stopLiveAssist();return;}
+            const l=LIVE_COPY[currentLang];
+            if(currentPhase!=='in_deal')return;
+            if(!document.getElementById('live_consent').checked){updateLiveUI(l.needConsent);return;}
+            if(document.getElementById('live_mode').value==='hybrid' &&
+                !document.getElementById('dg_consent').checked){updateLiveUI(l.needAI);return;}
+            liveAssist.active=true;
+            liveAssist.lastSignature='';
+            liveAssist.lastSentAt=0;
+            liveAssist.lastFinalTranscript='';
+            updateLiveUI();
+            updateMicUI();
+            scheduleLiveAlert();
+        }
+        function invalidateLiveAlert(shouldSchedule=true){
+            if(!liveAssist.active)return;
+            clearLiveTimerAndRequest();
+            clearLiveFindings();
+            updateLiveUI(LIVE_COPY[currentLang].pending);
+            if(shouldSchedule)scheduleLiveAlert();
+        }
+        function scheduleLiveAlert(){
+            if(!liveAssist.active || currentPhase!=='in_deal' || document.hidden)return;
+            if(!document.getElementById('live_consent').checked){stopLiveAssist();return;}
+            const mode=document.getElementById('live_mode').value;
+            if(mode==='hybrid' && !document.getElementById('dg_consent').checked){
+                stopLiveAssist(LIVE_COPY[currentLang].needAI);return;
+            }
+            const text=liveTextForAudit();
+            if(text.length<8){updateLiveUI(LIVE_COPY[currentLang].waiting);return;}
+            const signature=liveFingerprint();
+            if(signature===liveAssist.lastSignature)return;
+            if(liveAssist.timer!==null)clearTimeout(liveAssist.timer);
+            // Debounce typing/final speech, and throttle Gemini to bound API spend.
+            const interval=mode==='hybrid'?9000:2500;
+            const delay=Math.max(1000,interval-(Date.now()-liveAssist.lastSentAt));
+            liveAssist.timer=setTimeout(()=>{liveAssist.timer=null;void runLiveAlert();},delay);
+        }
+        function renderLiveAlert(data,mode){
+            const l=LIVE_COPY[currentLang];
+            const audit=mode==='hybrid'?data.audit:data;
+            if(!audit || !Array.isArray(audit.findings))throw Error('Malformed live audit');
+            const parent=document.getElementById('live_alerts');
+            parent.replaceChildren();
+            parent.style.display='block';
+            parent.className='live-alerts '+(audit.assessment==='VIOLATION'?'risk':'neutral');
+            const title=document.createElement('strong');
+            title.textContent=audit.assessment==='VIOLATION'?l.violation:
+                audit.assessment==='UNKNOWN'?l.unknown:l.clear;
+            parent.appendChild(title);
+            // Evidence stays textContent; no untrusted model text as HTML.
+            for(const finding of audit.findings){
+                if(finding.status!=='VIOLATION')continue;
+                const line=document.createElement('p');
+                const label=DG_LABELS[currentLang].rules[finding.rule]||finding.rule;
+                const value=finding.observed!==undefined?(' · '+finding.observed+' / '+finding.limit):'';
+                line.textContent=label+value;
+                parent.appendChild(line);
+                if(finding.evidence){
+                    const evidence=document.createElement('p');evidence.className='live-quote';
+                    evidence.textContent=String(finding.evidence).slice(0,180);
+                    parent.appendChild(evidence);
+                }
+            }
+            if(audit.assessment==='VIOLATION'){
+                const question=document.createElement('p');question.textContent=l.counter;
+                parent.appendChild(question);
+            }
+            const note=document.createElement('p');
+            note.textContent=mode==='hybrid'?DG_LABELS[currentLang].modeHybrid:DG_LABELS[currentLang].modeRules;
+            parent.appendChild(note);
+        }
+        async function runLiveAlert(){
+            if(!liveAssist.active || currentPhase!=='in_deal' || document.hidden)return;
+            const mode=document.getElementById('live_mode').value;
+            const source=liveTextForAudit(),signature=liveFingerprint();
+            if(source.length<8 || signature===liveAssist.lastSignature)return;
+            if(mode==='hybrid' && !document.getElementById('dg_consent').checked){stopLiveAssist();return;}
+            const requestSeq=++liveAssist.sequence;
+            const controller=new AbortController();
+            liveAssist.controller=controller;
+            liveAssist.lastSignature=signature;
+            liveAssist.lastSentAt=Date.now();
+            updateLiveUI(LIVE_COPY[currentLang].checking);
+            try{
+                const body={text:clientSideRedact(source).sanitizedText,
+                    structured_rules:getStructuredRules()};
+                if(mode==='hybrid')body.consent_to_model_processing=true;
+                const response=await fetch(mode==='hybrid'?'/hybrid-audit':'/audit',{
+                    method:'POST',headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify(body),signal:controller.signal
+                });
+                const data=await response.json();
+                if(!response.ok || data.error)throw Error(data.error||'HTTP '+response.status);
+                if(!liveAssist.active || currentPhase!=='in_deal' || document.hidden ||
+                    requestSeq!==liveAssist.sequence || signature!==liveFingerprint())return;
+                renderLiveAlert(data,mode);
+                updateLiveUI();
+            }catch(e){
+                if(!liveAssist.active || requestSeq!==liveAssist.sequence || document.hidden)return;
+                clearLiveFindings();
+                updateLiveUI(LIVE_COPY[currentLang].error);
+            }finally{
+                if(liveAssist.controller===controller)liveAssist.controller=null;
+            }
         }
 
         async function toggleMic() {
@@ -1891,6 +2129,7 @@ HTML_UI = r"""<!DOCTYPE html>
             speechBaseText=previous?(previous+'\n'):'';
             micStartPhase=currentPhase;
             try{
+                liveAssist.lastFinalTranscript='';
                 recognition=new SpeechRecognition();
                 recognition.lang=document.getElementById('voice_lang').value;
                 recognition.continuous=true;
@@ -1906,11 +2145,24 @@ HTML_UI = r"""<!DOCTYPE html>
                     editor.value=(speechBaseText+transcript).slice(0,3500);
                     stageDrafts[currentPhase]=editor.value;
                     updateDealCharCount();
-                    invalidateDealAudit();
+                    invalidateDealAudit(false);
+                    if(liveAssist.active){
+                        const finalSegments=[];
+                        for(let i=0;i<event.results.length;i++){
+                            if(event.results[i] && event.results[i].isFinal && event.results[i][0])
+                                finalSegments.push(event.results[i][0].transcript);
+                        }
+                        const finalized=finalSegments.join(' ').trim();
+                        if(finalized && finalized!==liveAssist.lastFinalTranscript){
+                            liveAssist.lastFinalTranscript=finalized;
+                            scheduleLiveAlert();
+                        }
+                    }
                 };
                 recognition.onerror=(event)=>{
                     const kind=event && event.error;
                     stopMicInternal();
+                    if(liveAssist.active)stopLiveAssist();
                     updateMicUI(kind==='not-allowed'||kind==='service-not-allowed'
                         ?(zh?'麦克风未获授权，请检查浏览器权限':'Microphone permission denied; check browser settings')
                         :(zh?'语音识别已中断，可手动继续输入':'Transcription interrupted; you can keep typing'));
@@ -2146,6 +2398,22 @@ HTML_UI = r"""<!DOCTYPE html>
             setLanguage(sysLang.startsWith('en')?'en':'zh');
             const editor=document.getElementById('input_text');
             editor.addEventListener('input',()=>{updateDealCharCount();invalidateDealAudit();});
+            document.getElementById('live_consent').addEventListener('change',()=>{
+                if(liveAssist.active && !document.getElementById('live_consent').checked)stopLiveAssist();
+            });
+            document.getElementById('live_mode').addEventListener('change',()=>stopLiveAssist());
+            document.getElementById('dg_consent').addEventListener('change',()=>{
+                if(liveAssist.active && document.getElementById('live_mode').value==='hybrid' &&
+                    !document.getElementById('dg_consent').checked)stopLiveAssist();
+            });
+            document.addEventListener('visibilitychange',()=>{
+                if(document.hidden && liveAssist.active)stopLiveAssist();
+                if(document.hidden && isListening)stopMicInternal();
+            });
+            window.addEventListener('pagehide',()=>{
+                if(liveAssist.active)stopLiveAssist();
+                if(isListening)stopMicInternal();
+            });
             ['dg_role','dg_discount','dg_pay_dir','dg_pay_days','dg_no_exclusive',
              'user_goal','hard_bottom_line','risk_preference'].forEach(id=>{
                 const element=document.getElementById(id);
