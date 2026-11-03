@@ -2142,9 +2142,9 @@ HTML_UI = r"""<!DOCTYPE html>
                 const diff=Math.max(0,num-bound);
                 if(currentLang==='zh')
                     return l.observed+'：'+num+'% · '+l.userRule+'：'+l.max+bound+
-                        '%'+(diff?' · 超出 '+diff.toFixed(2).replace(/\\.?0+$/,'')+' 个百分点':' · '+l.within);
+                        '%'+(diff?' · 超出 '+diff.toFixed(2).replace(/\.?0+$/,'')+' 个百分点':' · '+l.within);
                 return l.observed+': '+num+'% · '+l.userRule+': '+l.max+' '+bound+
-                    '%'+(diff?' · '+diff.toFixed(2).replace(/\\.?0+$/,'')+' percentage points '+l.extra:' · '+l.within);
+                    '%'+(diff?' · '+diff.toFixed(2).replace(/\.?0+$/,'')+' percentage points '+l.extra:' · '+l.within);
             }
             if(f.rule==='payment_days'){
                 const mode=f.direction || (getStructuredRules().payment_direction==='minimum'?'min':'max');
