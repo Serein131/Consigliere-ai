@@ -6,7 +6,15 @@
 
 Consigliere AI helps an early-stage founder separate **what the counterparty actually said**, **which explicitly configured rules would be broken**, and **what still needs verification**. It does not execute negotiations, replace lawyers or financial advisers, or guarantee commercial safety.
 
-## Product experience · v5.3 — one unified three-stage flow
+## Product experience · v5.4 — opt-in Live Assist in the unified workflow
+
+The live web app adds **Protect → Live Assist**, an explicitly authorized, foreground-only automatic alert session. It is off by default. The user checks an independent live-processing notice, chooses **Rules only** (default; sends masked fictional text to this Flask app but not Gemini) or **Gemini evidence + rules** (additionally requires its own Gemini consent), and presses **Start Live Assist**. The app checks typed terms after debouncing and finalized on-demand speech-recognition results; **interim speech, microphone stop, phase transitions and page backgrounding never start an automatic model call**. Results flag configured 10% discount / 45-day payment / no-exclusivity limits with actual evidence when available. Tactical advice still requires a separate user click.
+
+Stopping Live Assist, revoking consent, changing modes, navigating away or backgrounding aborts/invalidates outstanding checks. No persistent monitoring, native iOS background recording, guaranteed response time or independently validated detection accuracy is claimed. Browser speech recognition can use external providers; even rule-only audits send text to the app's server after user authorization.
+
+**New tests:** [headless Live Assist session test](tests/check_v54_live.js), [36-case bilingual synthetic alert challenge](research/live_alert_challenge_v54.json) and [diagnostic report generator](research/evaluate_live_alerts.py). These cases are developer-authored and cannot substitute for independent contract review or real iPad testing. [Reviewer protocol](research/REVIEWER_PROTOCOL_V54.md) explains how to collect independent labels.
+
+## Previous v5.3 foundation — one unified three-stage flow
 
 **One set of structured deal guardrails. One editable note/transcript box. One top-level 01 → 02 → 03 navigation.**
 
