@@ -5,7 +5,7 @@ import json
 import logging
 import http.client
 from flask import Flask, request, jsonify, render_template_string
-from dealguard import check_deal
+from dealguard import check_deal, extract_term_mentions
 from hybrid_service import execute_hybrid, HybridError, MAX_PROPOSAL_CHARS, MAX_REQUEST_BYTES
 
 app = Flask(__name__)
@@ -141,6 +141,7 @@ def hybrid_audit():
         )
     except HybridError as exc:
         return jsonify({"error": exc.code}), exc.status_code
+    output["term_mentions"] = extract_term_mentions(redacted["sanitized_text"])
     output["redacted_items_count"] = redacted["redaction_count"]
     response = jsonify(output)
     response.headers["Cache-Control"] = "no-store, private"
