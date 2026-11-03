@@ -2,7 +2,7 @@
 
 **An auditable AI decision-support prototype for startup deal terms.**
 
-[**Try the live demo**](https://consigliere-ai-seven.vercel.app/) · [**Read the research**](research/BENCHMARK.md) · [**Study the implementation**](dealguard.py)
+[**Try the live demo**](https://consigliere-ai-seven.vercel.app/) · [**Read the research**](research/BENCHMARK.md) · [**Founder Decision Log (English)**](research/FOUNDER_DECISION_LOG.md) · [**创始人决策记录 (中文)**](research/FOUNDER_DECISION_LOG_ZH.md) · [**Study the implementation**](dealguard.py)
 
 Consigliere AI helps an early-stage founder separate **what the counterparty actually said**, **which explicitly configured rules would be broken**, and **what still needs verification**. It does not execute negotiations, replace lawyers or financial advisers, or guarantee commercial safety.
 
