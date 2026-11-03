@@ -2,7 +2,7 @@ name: DealGuard Regression
 on:
   pull_request:
   push:
-    branches: [main, feature/v53-unified-three-stage-20261102, feature/hybrid-product-v52-20261102, feature/dealguard-constraint-engine, feature/dealguard-visible-dashboard]
+    branches: [main, feature/v54-consent-live-assist-20261103, feature/v53-unified-three-stage-20261102, feature/hybrid-product-v52-20261102, feature/dealguard-constraint-engine, feature/dealguard-visible-dashboard]
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
@@ -30,6 +30,8 @@ jobs:
           node --check /tmp/consigliere-ui.js
       - name: Exercise three-stage browser behavior without any API keys
         run: node tests/check_v53_browser.js
+      - name: Exercise consent-gated Live Assist without network or real microphone
+        run: node tests/check_v54_live.js
       - name: Evaluate 60 synthetic audit cases (diagnostic, not a general accuracy claim)
         run: |
           python research/evaluate.py
