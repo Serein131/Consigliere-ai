@@ -1,0 +1,229 @@
+{
+  "description": "Frozen v5.4 developer-authored synthetic risk challenge; no independent annotators, no real contracts.",
+  "created_date": "2026-11-03",
+  "rules": {
+    "role": "seller",
+    "discount_max_pct": 10,
+    "payment_direction": "maximum",
+    "payment_days": 45,
+    "prohibit_exclusivity": true
+  },
+  "cases": [
+    {
+      "id": "L01",
+      "text": "Buyer requests a 15% discount; payment terms 90 days; exclusivity applies.",
+      "expected": "risk",
+      "category": "three-conflicts"
+    },
+    {
+      "id": "L02",
+      "text": "The customer demands a 12% discount before signing.",
+      "expected": "risk",
+      "category": "discount"
+    },
+    {
+      "id": "L03",
+      "text": "We can proceed only if payment terms are 75 days.",
+      "expected": "risk",
+      "category": "payment"
+    },
+    {
+      "id": "L04",
+      "text": "The partner insists on a 12-month exclusivity agreement.",
+      "expected": "risk",
+      "category": "exclusivity"
+    },
+    {
+      "id": "L05",
+      "text": "买方要求15%折扣，付款期限90天，必须签订独家协议。",
+      "expected": "risk",
+      "category": "three-conflicts-zh"
+    },
+    {
+      "id": "L06",
+      "text": "客户希望折扣达到18%，否则终止合作。",
+      "expected": "risk",
+      "category": "pressure-zh"
+    },
+    {
+      "id": "L07",
+      "text": "对方提出付款周期120天，今天必须回复。",
+      "expected": "risk",
+      "category": "payment-zh"
+    },
+    {
+      "id": "L08",
+      "text": "供应商要求独家合作才能给报价。",
+      "expected": "risk",
+      "category": "exclusivity-zh"
+    },
+    {
+      "id": "L09",
+      "text": "We have not agreed. The buyer is proposing discount 17%.",
+      "expected": "risk",
+      "category": "conditional-proposal"
+    },
+    {
+      "id": "L10",
+      "text": "Our prospect asks for 20% price reduction on the annual deal.",
+      "expected": "risk",
+      "category": "synonym"
+    },
+    {
+      "id": "L11",
+      "text": "Client wants net 90 days, subject to board approval.",
+      "expected": "risk",
+      "category": "payment-net"
+    },
+    {
+      "id": "L12",
+      "text": "Only a 15 percent discount will close this deal.",
+      "expected": "risk",
+      "category": "percentage-spelled"
+    },
+    {
+      "id": "L13",
+      "text": "A 25% rebate is requested under a one-day deadline.",
+      "expected": "risk",
+      "category": "rebate-synonym"
+    },
+    {
+      "id": "L14",
+      "text": "We might be required to sign an exclusive arrangement.",
+      "expected": "risk",
+      "category": "modality"
+    },
+    {
+      "id": "L15",
+      "text": "对方要求价格下调20%，并要求在今天答复。",
+      "expected": "risk",
+      "category": "discount-synonym-zh"
+    },
+    {
+      "id": "L16",
+      "text": "The client proposed a 5% discount and payment terms 30 days with no exclusivity.",
+      "expected": "benign",
+      "category": "all-pass"
+    },
+    {
+      "id": "L17",
+      "text": "We agreed discount 8%, payment terms 25 days, without exclusivity.",
+      "expected": "benign",
+      "category": "agreed-pass"
+    },
+    {
+      "id": "L18",
+      "text": "双方约定折扣8%、账期30天、不含独家合作。",
+      "expected": "benign",
+      "category": "all-pass-zh"
+    },
+    {
+      "id": "L19",
+      "text": "The buyer accepted a 9% discount; payment terms 40 days; no exclusivity.",
+      "expected": "benign",
+      "category": "within-threshold"
+    },
+    {
+      "id": "L20",
+      "text": "Discount is 10%, payment terms 45 days; no exclusivity.",
+      "expected": "benign",
+      "category": "on-boundary"
+    },
+    {
+      "id": "L21",
+      "text": "A final discount of 3% was accepted. Payment period 12 days, without exclusivity.",
+      "expected": "benign",
+      "category": "final-pass"
+    },
+    {
+      "id": "L22",
+      "text": "我们确认5%折扣，付款周期15天，不接受独家协议。",
+      "expected": "benign",
+      "category": "confirmed-pass-zh"
+    },
+    {
+      "id": "L23",
+      "text": "Discount 0%, payment terms 1 day, without exclusivity.",
+      "expected": "benign",
+      "category": "no-discount"
+    },
+    {
+      "id": "L24",
+      "text": "We rejected the proposed 15% discount and agreed on 7% discount, payment terms 30 days, with no exclusivity.",
+      "expected": "benign",
+      "category": "rejection-then-agreement"
+    },
+    {
+      "id": "L25",
+      "text": "We discussed an exclusivity clause but agreed to remove exclusivity; discount is 8%, payment terms 20 days.",
+      "expected": "benign",
+      "category": "negated-exclusivity"
+    },
+    {
+      "id": "L26",
+      "text": "Meeting starts at 10 AM; let's discuss pricing tomorrow.",
+      "expected": "unknown",
+      "category": "no-deal-terms"
+    },
+    {
+      "id": "L27",
+      "text": "No discount or payment details were disclosed.",
+      "expected": "unknown",
+      "category": "unspecified"
+    },
+    {
+      "id": "L28",
+      "text": "They requested a 15% discount, which we rejected yesterday. No terms are agreed.",
+      "expected": "unknown",
+      "category": "rejected-violation"
+    },
+    {
+      "id": "L29",
+      "text": "Exclusivity has not been discussed. The price is still under review.",
+      "expected": "unknown",
+      "category": "unaddressed"
+    },
+    {
+      "id": "L30",
+      "text": "我们之前曾要求15%折扣，但该建议已经撤回。",
+      "expected": "unknown",
+      "category": "historical-rejected-zh"
+    },
+    {
+      "id": "L31",
+      "text": "The buyer mentioned a 12% discount, but later asked for 8% discount. Nothing is signed.",
+      "expected": "unknown",
+      "category": "conflicting-proposals"
+    },
+    {
+      "id": "L32",
+      "text": "Net terms might change after financial review; no numbers specified.",
+      "expected": "unknown",
+      "category": "vague-payment"
+    },
+    {
+      "id": "L33",
+      "text": "The contract says it may be exclusive depending on a later approval.",
+      "expected": "unknown",
+      "category": "conditional-exclusivity"
+    },
+    {
+      "id": "L34",
+      "text": "客户表示可能考虑折扣，但尚未确定比例和付款方式。",
+      "expected": "unknown",
+      "category": "conditional-vague-zh"
+    },
+    {
+      "id": "L35",
+      "text": "They will give a verbal commitment after legal review; no specific terms.",
+      "expected": "unknown",
+      "category": "unverified-verbal"
+    },
+    {
+      "id": "L36",
+      "text": "We used to offer a 20% discount last year; this year's terms are undecided.",
+      "expected": "unknown",
+      "category": "historical"
+    }
+  ]
+}
