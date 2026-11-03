@@ -1152,7 +1152,7 @@ HTML_UI = r"""<!DOCTYPE html>
             <button type="button" class="dg-primary" onclick="runHybridAudit()" id="dg_hybrid_btn">✦ AI evidence + rule check</button>
             <button type="button" class="dg-secondary" onclick="runDealGuardAudit()" id="dg_check_btn">Rules only · no Gemini</button>
         </div>
-        <p class="dg-action-hint" id="dg_mode_hint">Transcription and AI auditing are separate actions; no automatic requests.</p>
+        <p class="dg-action-hint" id="dg_mode_hint">Manual analysis is separate; Live Assist runs automatic checks only after specific session consent.</p>
         <div id="dg_output" class="dg-output" role="status" aria-live="polite">
             <div class="dg-result-mode" id="dg_mode_used"></div>
             <div class="dg-summary">
@@ -1821,12 +1821,12 @@ HTML_UI = r"""<!DOCTYPE html>
                 document.getElementById('btn_mail_client').innerText = "✉️ Open in Mail Client";
 
                 document.getElementById('sec3_title').innerText = "🔍 How it works · Privacy · Tests";
-                document.getElementById('privacy_desc').textContent = 'Decision support only. Transcript capture is user-initiated and does not auto-start AI inference. Browser speech recognition may rely on third parties. Regex redaction is incomplete; use fictional data and obtain applicable recording consent.';
+                document.getElementById('privacy_desc').textContent = 'Decision support only. Transcription and Live Assist require separate permission. When enabled, Live Assist automatically audits finalized speech or typed text; the optional Gemini mode requires further consent. Browser speech recognition may use third-party processing and redaction is incomplete. Use fictional data.';
             }
 
             document.getElementById('workflow_intro').textContent=lang==='zh'
-                ?'一组共享底线 · 一个输入框 · 每次 AI 调用由你决定'
-                :'One set of guardrails · One input · Every AI call is your choice.';
+                ?'一组共享底线 · 一个输入框 · AI 模式须主动授权'
+                :'One set of guardrails · One input · Opt-in AI processing.';
             document.getElementById('dg_live_label').textContent=lang==='zh'
                 ?'证据 → 底线 → 策略':'EVIDENCE → RULES → ACTION';
             document.getElementById('dg_audit_intro').textContent=lang==='zh'
