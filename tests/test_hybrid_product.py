@@ -170,10 +170,11 @@ class HybridEndpointTests(unittest.TestCase):
         response = self.client.get("/")
         page = response.get_data(as_text=True)
         self.assertEqual(response.status_code, 200)
-        for marker in ("v5.3", 'id="stage_prepare"', 'id="stage_live_audit"',
+        for marker in ("v5.4", 'id="stage_prepare"', 'id="stage_live_audit"',
                        'id="tab_pre_deal"', 'id="tab_in_deal"', 'id="tab_post_deal"',
                        'id="input_text"', 'id="mic_consent"', 'id="agent_consent"',
                        "dg_hybrid_btn", "dg_check_btn", "dg_consent", "dg_evidence",
+                       "live_assist_panel", "live_consent", "live_mode", "live_toggle",
                        "runHybridAudit", "toggleMic", "dg_reject_btn"):
             self.assertIn(marker, page)
         self.assertNotIn('id="dg_proposal"', page)

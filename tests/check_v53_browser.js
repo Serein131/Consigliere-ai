@@ -41,7 +41,9 @@ class Element{
 for(const id of ids)elements[id]=new Element(id);
 const doc={
   getElementById:id=>{if(!elements[id])throw Error('Missing DOM id: '+id);return elements[id];},
-  createElement:tag=>new Element(tag)
+  createElement:tag=>new Element(tag),
+  addEventListener:()=>{},
+  hidden:false
 };
 const defaults={
  dg_role:'seller',dg_discount:'10',dg_pay_dir:'maximum',dg_pay_days:'45',
