@@ -6,7 +6,20 @@
 
 Consigliere AI helps an early-stage founder separate **what the counterparty actually said**, **which explicitly configured rules would be broken**, and **what still needs verification**. It does not execute negotiations, replace lawyers or financial advisers, or guarantee commercial safety.
 
-## Product experience · v5.4 — opt-in Live Assist in the unified workflow
+## Product experience · v5.5 — actionable risk intervention
+
+Built from an AI-operated **five-fictional-role Chrome check** of v5.4 (not five real founder interviews), v5.5 adds:
+
+- **Rule-specific questions** for a detected discount, payment-term or exclusivity violation, with a clearly identified heuristic starting focus and *conditional*, non-binding trade-off examples. These are templates, not proven optimal bargaining strategies.
+- **Readable limits, direction and gaps** such as “15 days observed / minimum 60 days / 45 days earlier than your minimum.” The full set of checked PASS/VIOLATION/UNKNOWN conditions is visible even when no violation is found.
+- **Evidence-led term mentions**, including rejected/historical/agreement *wording* found in the submitted text, with short source excerpts. These are heuristic cues, not certified contract states. Hybrid mode continues to show Gemini selected terms and explicitly notes which literal quotes matched the source.
+- The manual audit shares the improved explanation and source ledger. Existing v5.4 opt-in foreground monitoring, consent gates, bilingual input, model fallback and single three-stage flow are preserved.
+
+**Reproducible scope:** [v5.5 implementation, limitations and five-role acceptance checks](research/PRODUCT_WORKFLOW_V55.md) · [browser regression](tests/check_v55_actionable.js) · [source ledger tests](tests/test_v55_trace.py). The available data is functional/synthetic; independent real-user and real iPad studies remain to be done.
+
+### Previous v5.4 monitoring foundations
+
+### Product experience · v5.4 — opt-in Live Assist in the unified workflow
 
 The live web app adds **Protect → Live Assist**, an explicitly authorized, foreground-only automatic alert session. It is off by default. The user checks an independent live-processing notice, chooses **Rules only** (default; sends masked fictional text to this Flask app but not Gemini) or **Gemini evidence + rules** (additionally requires its own Gemini consent), and presses **Start Live Assist**. The app checks typed terms after debouncing and finalized on-demand speech-recognition results; **interim speech, microphone stop, phase transitions and page backgrounding never start an automatic model call**. Results flag configured 10% discount / 45-day payment / no-exclusivity limits with actual evidence when available. Tactical advice still requires a separate user click.
 

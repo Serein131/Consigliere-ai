@@ -5,7 +5,7 @@ import json
 import logging
 import http.client
 from flask import Flask, request, jsonify, render_template_string
-from dealguard import check_deal
+from dealguard import check_deal, extract_term_mentions
 from hybrid_service import execute_hybrid, HybridError, MAX_PROPOSAL_CHARS, MAX_REQUEST_BYTES
 
 app = Flask(__name__)
@@ -141,6 +141,7 @@ def hybrid_audit():
         )
     except HybridError as exc:
         return jsonify({"error": exc.code}), exc.status_code
+    output["term_mentions"] = extract_term_mentions(redacted["sanitized_text"])
     output["redacted_items_count"] = redacted["redaction_count"]
     response = jsonify(output)
     response.headers["Cache-Control"] = "no-store, private"
@@ -356,7 +357,7 @@ HTML_UI = r"""<!DOCTYPE html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Consigliere AI v5.4 | Prepare · Protect · Debrief</title>
+    <title>Consigliere AI v5.5 | Prepare · Protect · Debrief</title>
     <style>
         :root {
             --bg-canvas: #f8fafc;
@@ -975,12 +976,32 @@ HTML_UI = r"""<!DOCTYPE html>
         .live-alerts p {margin:6px 0;overflow-wrap:anywhere}
         .live-alerts .live-quote {border-left:2px solid #cbd5e1;padding-left:8px;font-size:12px;color:#475569}
         @media(max-width:680px){.live-controls{align-items:stretch;flex-direction:column}.live-controls button,.live-controls select{width:100%}}
+    
+        /* v5.5: readable risk cards and evidence trail on narrow mobile screens. */
+        .v55-overview {display:grid;gap:9px;margin-top:10px}
+        .v55-rule {padding:10px 12px;border-radius:9px;background:#fff;border:1px solid #dbe4eb}
+        .v55-rule.is-risk {border-color:#fca5a5;background:#fff6f6}
+        .v55-rule.is-unknown {border-color:#fbd38d;background:#fffcf1}
+        .v55-rule strong {font-size:13px;margin-bottom:4px}
+        .v55-rule p {font-size:12px;margin:4px 0;color:#334155}
+        .v55-quote {font-size:12px;padding-left:9px;border-left:2px solid #94a3b8;overflow-wrap:anywhere}
+        .v55-guidance {margin-top:12px;padding:12px;border-radius:10px;background:#f0fdfa;border:1px solid #a7f3d0}
+        .v55-guidance h4 {font-size:13px;margin:2px 0 8px;color:#115e59}
+        .v55-guidance p {font-size:12.5px;line-height:1.6;margin:7px 0}
+        .v55-guidance .v55-question {font-size:13px;font-weight:650;color:#134e4a}
+        .v55-evidence {margin-top:12px;padding:10px;border-radius:9px;border:1px solid #cbd5e1;background:#f8fafc}
+        .v55-evidence h4 {font-size:13px;margin:0 0 7px}
+        .v55-evidence .v55-record {border-left:3px solid #cbd5e1;padding:5px 8px;margin:6px 0;background:#fff}
+        .v55-evidence .v55-state {font-size:11px;font-weight:700;color:#475569;margin-bottom:3px}
+        .v55-evidence .v55-record p {font-size:12px;margin:0;overflow-wrap:anywhere}
+        .v55-caption {font-size:11px!important;color:#64748b!important;line-height:1.5}
+        #dg_term_timeline {margin:12px 0}
     </style>
 </head>
 <body>
     <div class="header-row">
         <div>
-            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.4 · Consent-Based Live Assist</span></div>
+            <div class="main-title">⚡ Consigliere AI <span class="badge">v5.5 · Actionable Risk Intervention</span></div>
             <div class="subtitle" id="subtitle_text">Set limits · Verify terms · Explore options</div>
         </div>
         <div class="lang-switch">
@@ -1165,6 +1186,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 <div class="dg-term-grid" id="dg_extracted_terms"></div>
             </div>
             <div class="dg-findings" id="dg_findings"></div>
+            <div id="dg_term_timeline" style="display:none"></div>
             <div class="dg-risk" id="dg_risk" style="display:none"><strong id="dg_risk_title">Commercial risk review — separate from rules</strong><div id="dg_risk_findings"></div></div>
             <div id="dg_rule_warnings" class="dg-footnote"></div>
             <div class="dg-footnote" id="dg_footnote">This is decision support, not a contract certification. Always verify ambiguous terms.</div>
@@ -1480,7 +1502,10 @@ HTML_UI = r"""<!DOCTYPE html>
             if(finding.evidence && finding.evidence!=='Explicit exclusivity language detected.')parts.push(finding.evidence);
             if(finding.reason)parts.push(finding.reason);
             evidence.textContent=parts.join(' · ');
-            card.append(title,state,evidence);parent.appendChild(card);
+            const meaning=document.createElement('div');
+            meaning.className='dg-finding-evidence';
+            meaning.textContent=v55FindingDetail(finding);
+            card.append(title,state,evidence,meaning);parent.appendChild(card);
         }
         function renderExtractedTerms(payload, l) {
             const box=document.getElementById('dg_evidence');
@@ -1519,6 +1544,7 @@ HTML_UI = r"""<!DOCTYPE html>
             const findings=document.getElementById('dg_findings');
             findings.replaceChildren();
             audit.findings.forEach(f=>addAuditFinding(findings,f,l));
+            renderTermMentions(document.getElementById('dg_term_timeline'),payload,mode);
             if(mode==='hybrid')renderExtractedTerms(payload,l);
             else{
                 document.getElementById('dg_extracted_terms').replaceChildren();
@@ -2039,8 +2065,181 @@ HTML_UI = r"""<!DOCTYPE html>
             const delay=Math.max(1000,interval-(Date.now()-liveAssist.lastSentAt));
             liveAssist.timer=setTimeout(()=>{liveAssist.timer=null;void runLiveAlert();},delay);
         }
+        // v5.5: explain every checked constraint; suggest *conditional* questions,
+        // not automated concessions or unverified "optimal" tactics.
+        const ACTION_COPY = {
+            en:{
+                observed:'Observed',max:'maximum',min:'minimum',userRule:'Your rule',
+                extra:'above the maximum',early:'earlier than your minimum',
+                late:'longer than your maximum',within:'Within configured threshold',
+                notSpecified:'No supported, explicit current term; verify before agreeing.',
+                exclusiveViolation:'Exclusivity requested despite a no-exclusivity rule.',
+                exclusivePass:'No current exclusivity conflict identified in this check.',
+                exclusiveUnknown:'Exclusivity not verified; review the actual clause.',
+                focus:'Suggested first issue to clarify (heuristic, not a ranking)',
+                examples:'Example counter-questions · nothing is agreed automatically',
+                tradeOff:'Possible conditional trade-off, not a recommendation to concede:',
+                exclusiveQuestion:'Can we remove exclusivity or clarify its geographic scope, channels and duration before proceeding?',
+                exclusiveTrade:'Consider whether a limited volume commitment could replace exclusivity; confirm your own limits first.',
+                payMaxQuestion:'Could the payment period be reduced to at most {limit} days? If not, what security can you offer?',
+                payMinQuestion:'Could we agree to a payment window of at least {limit} days before committing?',
+                payTrade:'Consider documented milestones or payment security, without changing the agreed limits automatically.',
+                discountQuestion:'Could the discount stay at or below {limit}%? What scope or volume would support that?',
+                discountTrade:'Explore scope or volume changes only if they independently serve your commercial goals.',
+                ledgerTitle:'Mentioned deal terms · source excerpts',
+                ledgerNote:'Chronology labels below are heuristic text cues, not independently verified agreement status or legal advice.',
+                modelNote:'Gemini candidate status and source quote are separately shown; literal quote matching does not validate interpretation.',
+                noMentions:'No recognizable term chronology found. Do not assume absent terms are safe.',
+                status:{rejected:'Rejected wording',historical:'Historical wording',agreed:'Agreement wording',
+                    proposed:'Proposal wording',ambiguous:'Conditional / uncertain wording',
+                    not_required:'No-exclusivity wording'},
+                first:'First clarify',risk:'Rule conflict',pass:'Meets rule',unknown:'Not verified',
+                attention:'Review the source and reconfirm current terms before committing.',
+                auditTitle:'Rules checked',unconfigured:'Not configured',value:'Proposed value'
+            },
+            zh:{
+                observed:'识别到的条件',max:'最多',min:'至少',userRule:'你的底线',
+                extra:'超过折扣上限',early:'比最低允许账期提前',late:'比最长允许账期延后',
+                within:'处于设定的允许范围内',
+                notSpecified:'没有识别到可支持结论的当前条款，承诺前请人工核实。',
+                exclusiveViolation:'对方提出排他性要求，与你的禁止独家底线冲突。',
+                exclusivePass:'本次核查未识别到当前独家冲突。',
+                exclusiveUnknown:'尚不能确认是否涉及排他义务，需审查具体条款。',
+                focus:'建议首先澄清的事项（启发式排序，不是最优策略）',
+                examples:'可直接参考的反问 · 不会自动接受任何条件',
+                tradeOff:'可探讨的附带交换条件（并非建议主动让步）：',
+                exclusiveQuestion:'能否取消独家条款？如不能，请先明确涉及的地区、渠道和期限。',
+                exclusiveTrade:'只有在符合自身目标时，才考虑用有限采购量承诺换取取消排他性。',
+                payMaxQuestion:'能否将付款期限控制在{limit}天以内？如不能，对方能提供什么付款保障？',
+                payMinQuestion:'能否先确认付款期限不少于{limit}天，再讨论其他条件？',
+                payTrade:'可探讨书面里程碑或付款保障，但不自动改变你的账期底线。',
+                discountQuestion:'折扣能否控制在{limit}%以内？哪些合作范围或采购量可以支持这个条件？',
+                discountTrade:'只有范围或交易量本身合理时，才考虑以此交换折扣条件。',
+                ledgerTitle:'已提及的交易条款 · 原文证据',
+                ledgerNote:'以下“已同意/已拒绝”等仅为文字线索的启发式标注，不代表已证明协议生效或法律效力。',
+                modelNote:'Gemini 候选条款与原文分别显示；原文匹配并不能保证语义、报价状态或法律解释正确。',
+                noMentions:'尚未发现可供回溯的条款片段，不能据此认定安全。',
+                status:{rejected:'拒绝用语',historical:'历史用语',agreed:'同意用语',
+                    proposed:'提议用语',ambiguous:'条件或不确定用语',not_required:'非独家用语'},
+                first:'优先确认',risk:'底线冲突',pass:'符合规则',unknown:'证据不足',
+                attention:'承诺前请核对原文，并确认当前有效的合同条件。',
+                auditTitle:'逐项底线核查',unconfigured:'未配置',value:'对方条件'}
+        };
+        function v55StatusLabel(f){
+            const l=ACTION_COPY[currentLang];
+            return f.status==='VIOLATION'?l.risk:f.status==='PASS'?l.pass:l.unknown;
+        }
+        function v55FindingDetail(f){
+            const l=ACTION_COPY[currentLang];
+            const num=Number(f.observed),bound=Number(f.limit);
+            if(f.rule==='no_exclusivity'){
+                return f.status==='VIOLATION'?l.exclusiveViolation:
+                    f.status==='PASS'?l.exclusivePass:l.exclusiveUnknown;
+            }
+            if(f.status==='UNKNOWN' || !Number.isFinite(num) || !Number.isFinite(bound))
+                return l.notSpecified;
+            if(f.rule==='maximum_discount_pct'){
+                const diff=Math.max(0,num-bound);
+                if(currentLang==='zh')
+                    return l.observed+'：'+num+'% · '+l.userRule+'：'+l.max+bound+
+                        '%'+(diff?' · 超出 '+diff.toFixed(2).replace(/\.?0+$/,'')+' 个百分点':' · '+l.within);
+                return l.observed+': '+num+'% · '+l.userRule+': '+l.max+' '+bound+
+                    '%'+(diff?' · '+diff.toFixed(2).replace(/\.?0+$/,'')+' percentage points '+l.extra:' · '+l.within);
+            }
+            if(f.rule==='payment_days'){
+                const mode=f.direction || (getStructuredRules().payment_direction==='minimum'?'min':'max');
+                const diff=Math.max(0,mode==='min'?bound-num:num-bound);
+                if(currentLang==='zh')
+                    return l.observed+'：'+num+'天 · '+l.userRule+'：'+
+                        (mode==='min'?l.min:l.max)+bound+'天'+
+                        (diff?' · '+(mode==='min'?'提前':'延后')+diff+'天':' · '+l.within);
+                return l.observed+': '+num+' days · '+l.userRule+': '+
+                    (mode==='min'?l.min:l.max)+' '+bound+' days'+
+                    (diff?' · '+diff+' days '+(mode==='min'?l.early:l.late):' · '+l.within);
+            }
+            return l.notSpecified;
+        }
+        function v55Question(f){
+            const l=ACTION_COPY[currentLang];
+            const limit=f.limit==null?'?':String(f.limit);
+            if(f.rule==='no_exclusivity')
+                return {question:l.exclusiveQuestion,trade:l.exclusiveTrade};
+            if(f.rule==='payment_days'){
+                const direction=f.direction || (getStructuredRules().payment_direction==='minimum'?'min':'max');
+                return {question:(direction==='min'?l.payMinQuestion:l.payMaxQuestion)
+                            .replace('{limit}',limit),trade:l.payTrade};
+            }
+            if(f.rule==='maximum_discount_pct')
+                return {question:l.discountQuestion.replace('{limit}',limit),trade:l.discountTrade};
+            return {question:l.attention,trade:''};
+        }
+        function v55Priority(f){
+            // A transparent default for triage, never a utility optimization.
+            const tiers={no_exclusivity:0,payment_days:1,maximum_discount_pct:2};
+            return tiers[f.rule]===undefined?10:tiers[f.rule];
+        }
+        function v55AppendRule(parent,f){
+            const l=ACTION_COPY[currentLang];
+            const card=document.createElement('div');
+            card.className='v55-rule '+(f.status==='VIOLATION'?'is-risk':
+                f.status==='UNKNOWN'?'is-unknown':'is-pass');
+            const header=document.createElement('strong');
+            header.textContent=(DG_LABELS[currentLang].rules[f.rule]||f.rule)+' · '+v55StatusLabel(f);
+            const detail=document.createElement('p');detail.textContent=v55FindingDetail(f);
+            card.append(header,detail);
+            if(f.evidence){
+                const quote=document.createElement('p');quote.className='v55-quote';
+                quote.textContent=String(f.evidence).slice(0,190);
+                card.appendChild(quote);
+            }
+            if(f.reason && f.status==='UNKNOWN'){
+                const reason=document.createElement('p');reason.textContent=String(f.reason).slice(0,180);
+                card.appendChild(reason);
+            }
+            parent.appendChild(card);
+        }
+        function renderTermMentions(parent,data,mode){
+            const l=ACTION_COPY[currentLang];
+            parent.replaceChildren();
+            const mentions=Array.isArray(data.term_mentions)?data.term_mentions:[];
+            const extracted=mode==='hybrid'&&data.extraction&&Array.isArray(data.extraction.terms)
+                ?data.extraction.terms:[];
+            if(!mentions.length && !extracted.length){parent.style.display='none';return;}
+            parent.style.display='block';
+            parent.className='v55-evidence';
+            const head=document.createElement('h4');head.textContent=l.ledgerTitle;
+            parent.appendChild(head);
+            const note=document.createElement('p');note.className='v55-caption';
+            note.textContent=l.ledgerNote;parent.appendChild(note);
+            for(const item of mentions.slice(0,14)){
+                const card=document.createElement('div');card.className='v55-record';
+                const state=document.createElement('div');state.className='v55-state';
+                state.textContent=(DG_LABELS[currentLang].termFields[item.field]||item.field)+
+                    ' · '+(l.status[item.state]||l.unknown);
+                const evidence=document.createElement('p');
+                evidence.textContent=String(item.evidence||'').slice(0,190);
+                card.append(state,evidence);parent.appendChild(card);
+            }
+            if(mode==='hybrid' && extracted.length){
+                const n=document.createElement('p');n.className='v55-caption';
+                n.textContent=l.modelNote;parent.appendChild(n);
+                for(const item of extracted){
+                    const card=document.createElement('div');card.className='v55-record';
+                    const state=document.createElement('div');state.className='v55-state';
+                    state.textContent=(DG_LABELS[currentLang].termFields[item.field]||item.field)+
+                        ' · '+(DG_LABELS[currentLang].sourceStatuses[item.source_status]||item.source_status)+
+                        ' · '+(item.quote_verified?
+                            (currentLang==='zh'?'找到原文':'source quote matched'):
+                            (currentLang==='zh'?'没有可验证原文':'no validated quote'));
+                    const quote=document.createElement('p');
+                    quote.textContent=item.quote_verified?String(item.evidence).slice(0,190):
+                        (currentLang==='zh'?'需人工核实':'Review manually');
+                    card.append(state,quote);parent.appendChild(card);
+                }
+            }
+        }
         function renderLiveAlert(data,mode){
-            const l=LIVE_COPY[currentLang];
+            const l=LIVE_COPY[currentLang], copy=ACTION_COPY[currentLang];
             const audit=mode==='hybrid'?data.audit:data;
             if(!audit || !Array.isArray(audit.findings))throw Error('Malformed live audit');
             const parent=document.getElementById('live_alerts');
@@ -2051,27 +2250,41 @@ HTML_UI = r"""<!DOCTYPE html>
             title.textContent=audit.assessment==='VIOLATION'?l.violation:
                 audit.assessment==='UNKNOWN'?l.unknown:l.clear;
             parent.appendChild(title);
-            // Evidence stays textContent; no untrusted model text as HTML.
-            for(const finding of audit.findings){
-                if(finding.status!=='VIOLATION')continue;
-                const line=document.createElement('p');
-                const label=DG_LABELS[currentLang].rules[finding.rule]||finding.rule;
-                const value=finding.observed!==undefined?(' · '+finding.observed+' / '+finding.limit):'';
-                line.textContent=label+value;
-                parent.appendChild(line);
-                if(finding.evidence){
-                    const evidence=document.createElement('p');evidence.className='live-quote';
-                    evidence.textContent=String(finding.evidence).slice(0,180);
-                    parent.appendChild(evidence);
+            const label=document.createElement('p');
+            label.textContent=copy.auditTitle+' · '+audit.findings.length;
+            parent.appendChild(label);
+            const wrap=document.createElement('div');wrap.className='v55-overview';
+            for(const finding of audit.findings)v55AppendRule(wrap,finding);
+            parent.appendChild(wrap);
+            const violated=audit.findings.filter(f=>f.status==='VIOLATION')
+                .sort((a,b)=>v55Priority(a)-v55Priority(b));
+            if(violated.length){
+                const guidance=document.createElement('div');guidance.className='v55-guidance';
+                const title=document.createElement('h4');title.textContent=copy.examples;guidance.appendChild(title);
+                const focus=document.createElement('p');focus.className='v55-caption';
+                focus.textContent=copy.focus+': '+(DG_LABELS[currentLang].rules[violated[0].rule]||violated[0].rule);
+                guidance.appendChild(focus);
+                for(const finding of violated){
+                    const h=document.createElement('p');
+                    h.textContent=(DG_LABELS[currentLang].rules[finding.rule]||finding.rule)+':';
+                    guidance.appendChild(h);
+                    const q=document.createElement('p');q.className='v55-question';
+                    const suggestion=v55Question(finding);
+                    q.textContent=suggestion.question;
+                    guidance.appendChild(q);
+                    const trade=document.createElement('p');trade.className='v55-caption';
+                    trade.textContent=copy.tradeOff+' '+suggestion.trade;
+                    guidance.appendChild(trade);
                 }
+                parent.appendChild(guidance);
             }
-            if(audit.assessment==='VIOLATION'){
-                const question=document.createElement('p');question.textContent=l.counter;
-                parent.appendChild(question);
-            }
-            const note=document.createElement('p');
-            note.textContent=mode==='hybrid'?DG_LABELS[currentLang].modeHybrid:DG_LABELS[currentLang].modeRules;
-            parent.appendChild(note);
+            const evidence=document.createElement('div');
+            renderTermMentions(evidence,data,mode);
+            if(evidence.style.display!=='none')parent.appendChild(evidence);
+            const caution=document.createElement('p');caution.className='v55-caption';
+            caution.textContent=copy.attention+' · '+(mode==='hybrid'?
+                DG_LABELS[currentLang].modeHybrid:DG_LABELS[currentLang].modeRules);
+            parent.appendChild(caution);
         }
         async function runLiveAlert(){
             if(!liveAssist.active || currentPhase!=='in_deal' || document.hidden)return;

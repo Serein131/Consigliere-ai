@@ -126,6 +126,18 @@ The core hypothesis is not that my underlying model is smarter than ChatGPT or G
 
 **Evidence:** [frozen challenge](https://github.com/Serein131/Consigliere-ai/blob/main/research/live_alert_challenge_v54.json) · [evaluation code](https://github.com/Serein131/Consigliere-ai/blob/main/research/evaluate_live_alerts.py) · [CI with generated diagnostic artifact](https://github.com/Serein131/Consigliere-ai/actions/runs/41613957651).
 
+## Decision 09 — Turn simulated alert feedback into actionable, verifiable next steps
+
+**Question:** In a negotiation, is a generic “can we renegotiate” response useful enough after the system spots a threshold violation?
+
+**Evidence:** A single AI operator ran **five fictional business roles** in remote Chrome against v5.4. All five recorded outputs matched their scenario-specific expectations, but the three violation cases received essentially the same generic clarifying prompt; non-violation cases did not clearly show which historic and current clauses were relied upon. These were **not five independent people or proof of willingness to use the product**.
+
+**Choice:** For v5.5 I prioritized **rule-specific counter-questions, transparent numerical threshold/direction comparisons, and a short, clearly heuristic ledger of source mentions**, rather than making the underlying Gemini prompts more grandiose. The UI now displays checked PASS/VIOLATION/UNKNOWN rules even when no violation is detected.
+
+**Trade-off:** A question template is not an optimal game-theoretic action; a quoted statement is not proof of its legal status. The new explanatory layer can misclassify complex chronology. Its success in unit/simulated-browser testing does not prove actual behavior in Chrome, Safari, live speech or real founders' negotiations.
+
+**Evidence:** [v5.5 acceptance criteria](https://github.com/Serein131/Consigliere-ai/blob/main/research/PRODUCT_WORKFLOW_V55.md) · [five-role simulated-browser tests](https://github.com/Serein131/Consigliere-ai/blob/main/tests/check_v55_actionable.js) · [term-mention tests](https://github.com/Serein131/Consigliere-ai/blob/main/tests/test_v55_trace.py).
+
 ## How I worked with AI — and what “I built” means
 
 - **Founder-originated motivation and direction:** I identified the negotiation regret problem and articulated the private-strategist / cognitive-exoskeleton vision. I prioritized an iPhone/iPad-usable bilingual prototype, explicit commercial boundaries, and consent-based intervention.

@@ -187,6 +187,53 @@ def _exclusive_check(clauses):
     # clause must not itself be reported as demanding the clause.
     return {k:v for k,v in current[-1].items() if k!="clause_index"}
 
+def extract_term_mentions(text):
+    """Best-effort surface-evidence ledger, NOT a verified contractual chronology.
+
+    Extracts only short substrings of the already-redacted input, tags likely
+    historic/rejected/agreed/proposed wording, and never asserts legal status.
+    Its states are *heuristic annotations*, independent of the audited findings.
+    """
+    raw = str(text or "")[:3500]
+    chunks = [part.strip() for part in re.split(r"[。！？;；\n]|(?<=[.!?])\s+", raw) if part.strip()]
+    rows = []
+    for clause in chunks[:18]:
+        if REJECTED.search(clause):
+            state = "rejected"
+        elif HISTORICAL.search(clause):
+            state = "historical"
+        elif CONFIRMED.search(clause) or re.search(r"(?:最终同意|双方同意|同意了|已经同意|达成一致)",clause):
+            state = "agreed"
+        elif re.search(r"\b(?:maybe|might|possibly|subject to|depending on|if approved)\b|"
+                       r"(?:可能|如果|待批准|尚未确定|尚待)",clause,re.I):
+            state = "ambiguous"
+        else:
+            state = "proposed"
+        discount = _extract_numbered([clause], "discount")
+        payment = _extract_numbered([clause], "payment")
+        # Supplemental recognition for common word orders not handled by the
+        # rules-only engine. This is display-only and NEVER changes a verdict.
+        if not payment:
+            alt = re.search(r"(\d{1,4})\s*天(?:内)?\s*付款|\bpayment\s+in\s+(\d{1,4})\s*days?\b",clause,re.I)
+            if alt:
+                val = int(alt.group(1) or alt.group(2))
+                payment = [{"observed":val,"evidence":alt.group(0)}] if val<=3650 else []
+        for kind,terms in (("discount",discount),("payment",payment)):
+            for term in terms[:4]:
+                rows.append({"field":kind,"state":state,"value":term["observed"],
+                             "evidence":clause[:190]})
+        if (EXCLUSIVITY.search(clause) or
+            re.search(r"\b(?:only|sole|exclusive)\s+(?:reseller|distributor|supplier)\b",clause,re.I)):
+            # A negated exclusivity statement is positive scope evidence,
+            # but not proof that the actual deal has been signed.
+            negative = bool(NEGATIVE_EXCLUSIVE.search(clause) or
+                            re.search(r"非(?:独家|排他)|\bnon[- ]exclusive\b",clause,re.I))
+            rows.append({"field":"exclusivity",
+                         "state":"not_required" if negative else state,
+                         "value":None,"evidence":clause[:190]})
+    return rows[:24]
+
+
 def check_deal(text, rules_text="", structured_rules=None):
     """Evaluate only explicitly configured, machine-recognized deal constraints.
 
@@ -237,4 +284,5 @@ def check_deal(text, rules_text="", structured_rules=None):
             "commercial_risk_level":"REVIEW" if commercial_risks else "NOT_ASSESSED",
             "rule_warnings":warnings,
             "recognized_rules":cfg,
+            "term_mentions":extract_term_mentions(text),
             "scope":"Only configured, recognized checks. PASS does not mean a safe or enforceable deal."}
