@@ -35,7 +35,7 @@ class GuardrailContinuity(unittest.TestCase):
         payload = dict(text=source, structured_rules=RULES, consent_to_model_processing=True)
         audit = check_deal("payment within 60 days", structured_rules=RULES)
         with patch("app.execute_hybrid", return_value={"audit": audit}):
-            receipt = client.post("/hybrid-audit", json=dict(consent_to_model_processing=True, payload, consent_to_model_processing=True)).json["audit_receipt"]
+            receipt = client.post("/hybrid-audit", json=dict(payload, consent_to_model_processing=True)).json["audit_receipt"]
         payload.update(phase="in_deal", audit_receipt=receipt)
         response = {"candidates": [{"content": {"parts": [{"text": '{"risk_level":"MEDIUM"}'}]}}]}
         with patch("app.call_gemini_rest", return_value=response) as model:
