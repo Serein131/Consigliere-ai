@@ -35,6 +35,11 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def git_blob_sha1(path):
+    body = path.read_bytes()
+    return hashlib.sha1(b"blob " + str(len(body)).encode("ascii") + b"\\0" + body).hexdigest()
+
+
 def error_for(expected, actual):
     if expected == "risk":
         return None if actual == "VIOLATION" else (
@@ -120,6 +125,8 @@ def main():
     parser.add_argument("--max-fp", type=int, default=None,
                         help="False alerts allowed. Compare with recorded baseline.")
     parser.add_argument("--max-unsafe-pass", type=int, default=None)
+    parser.add_argument("--expected-suite-git-sha1", default=None,
+                        help="Fail if the deliberately frozen fixture was silently edited")
     args = parser.parse_args()
     source = pathlib.Path(args.suite)
     if not source.is_absolute():
@@ -127,12 +134,15 @@ def main():
     output = pathlib.Path(args.out_dir)
     output.mkdir(parents=True, exist_ok=True)
 
+    if args.expected_suite_git_sha1 and git_blob_sha1(source) != args.expected_suite_git_sha1:
+        raise SystemExit("FROZEN_SUITE_CHECKSUM_MISMATCH: require a new reviewed fixture version")
     data = json.loads(source.read_text(encoding="utf-8"))
     report = evaluate(data)
     report["provenance"] = {
         "executed_at_utc": datetime.now(timezone.utc).isoformat(),
         "suite_path": str(source.relative_to(ROOT)) if source.is_relative_to(ROOT) else source.name,
         "suite_sha256": digest(source),
+        "suite_git_blob_sha1": git_blob_sha1(source),
         "rule_engine_sha256": digest(ROOT / "dealguard.py"),
         "label_origin": data.get("description", "Unverified labels; inspect source metadata."),
         "system_under_test": "rules-only DealGuard; not Gemini, full agent or iOS",
