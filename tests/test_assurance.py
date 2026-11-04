@@ -59,6 +59,17 @@ class DecisionAssuranceTests(unittest.TestCase):
         self.assertEqual(r.json["error"], "INVALID_PHASE_OR_LANGUAGE")
 
     @patch.dict(os.environ, {"GEMINI_API_KEY": "fake-in-tests"})
+    def test_strategy_api_denies_unconsented_model_call(self):
+        with patch("app.call_gemini_rest") as model:
+            response = self.client.post("/analyze", json={
+                "text": "discount 12%", "phase": "in_deal",
+                "structured_rules": RULES, "consent_to_model_processing": False,
+            })
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json["error"], "MODEL_CONSENT_REQUIRED")
+        model.assert_not_called()
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "fake-in-tests"})
     def test_model_safe_verdict_demoted_and_response_allowlisted(self):
         model = {"candidates": [{"content": {"parts": [{"text":
             '{"risk_level":"SAFE","box1_text":"no extra risk","extraneous_private_field":"ignore"}'
@@ -66,7 +77,8 @@ class DecisionAssuranceTests(unittest.TestCase):
         with patch("app.call_gemini_rest", return_value=model):
             r = self.client.post("/analyze", json={
                 "text": "10% discount; payment terms 30 days; no exclusivity",
-                "phase": "in_deal", "structured_rules": RULES
+                "phase": "in_deal", "structured_rules": RULES,
+                "consent_to_model_processing": True
             })
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.json["tactical_advice"]["risk_level"], "LOW")
@@ -77,7 +89,8 @@ class DecisionAssuranceTests(unittest.TestCase):
     def test_bad_model_json_never_reflects_provider_text(self):
         model = {"candidates": [{"content": {"parts": [{"text": "secret-company: malformed"}]}}]}
         with patch("app.call_gemini_rest", return_value=model):
-            r = self.client.post("/analyze", json={"text": "discount 12%", "structured_rules": RULES})
+            r = self.client.post("/analyze", json={"text": "discount 12%", "structured_rules": RULES,
+                "consent_to_model_processing": True})
         self.assertEqual(r.status_code, 502)
         self.assertEqual(r.json["error"], "MODEL_FORMAT_ERROR")
         self.assertNotIn("secret-company", r.get_data(as_text=True))
