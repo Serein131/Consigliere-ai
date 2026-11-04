@@ -15,7 +15,7 @@ jobs:
         run: python -m pip install "flask>=3.0.0"
       - name: Compile and test rule checks + hybrid API
         run: |
-          python -m py_compile app.py dealguard.py hybrid_service.py research/evidence_hybrid.py
+          python -m py_compile app.py dealguard.py assurance.py hybrid_service.py research/evidence_hybrid.py research/continuous_eval.py
           python -m unittest discover -s tests -v
       - name: Check browser JavaScript parses
         run: |
@@ -42,6 +42,17 @@ jobs:
           python research/evaluate.py --cases research/challenge_cases.json --output research/challenge_report.md --json research/challenge_report.json
       - name: Measure v5.4 live alert sensitivity and false alarms on frozen synthetic cases
         run: python research/evaluate_live_alerts.py
+      - name: Continuous assurance loop — 36-case rules-only non-regression gate
+        run: |
+          python research/continuous_eval.py --suite research/live_alert_challenge_v54.json \
+            --out-dir /tmp/consigliere-eval --max-fn 3 --max-fp 2 --max-unsafe-pass 0 --expected-suite-git-sha1 ce4c3cf014c9c0fb7f141a62352c74ce3f197dc0
+      - name: Attach continuous evaluation failures and provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assurance-synthetic-evaluation
+          path: /tmp/consigliere-eval/
+          retention-days: 30
       - name: Replay reviewed incidents and write failure queue
         run: python research/replay_incidents.py --output research/incident-report.json
       - name: Attach synthetic benchmark and failure report

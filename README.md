@@ -133,3 +133,11 @@ The standalone `/audit` endpoint performs rule checks without invoking Gemini. `
 ## Purpose
 
 This repository is both a working early prototype and a transparent record of its failures, experiments and next research steps. Rather than marketing 100% accuracy, the goal is an **explainable commitment firewall** whose uncertainty and evidence can be inspected.
+
+
+## Safety assurance and repeatable improvement (v5.6 candidate)
+
+See [Safety & Learning Loop](research/SAFETY_AND_LEARNING_LOOP.md) for the threat boundaries,
+server-side model-consent policy, privacy-minimal decision receipts, error taxonomy, and
+the pinned 36-case **rules-only synthetic** CI non-regression gate. This does **not** prove
+Gemini safety, independent contract accuracy, zero retention, or autonomous model learning.
