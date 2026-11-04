@@ -32,7 +32,7 @@ class GuardrailContinuity(unittest.TestCase):
     def test_strategy_reuses_signed_hybrid_audit_only_for_same_context(self):
         client = app.test_client()
         source = "Funds will arrive two months after invoicing."
-        payload = dict(text=source, structured_rules=RULES)
+        payload = dict(text=source, structured_rules=RULES, consent_to_model_processing=True)
         audit = check_deal("payment within 60 days", structured_rules=RULES)
         with patch("app.execute_hybrid", return_value={"audit": audit}):
             receipt = client.post("/hybrid-audit", json=dict(payload, consent_to_model_processing=True)).json["audit_receipt"]
@@ -53,7 +53,7 @@ class GuardrailContinuity(unittest.TestCase):
             for lang in ("zh", "en"):
                 for direction, days in [("maximum", 60), ("minimum", 30)]:
                     source = OFFER.replace("60 days", f"{days} days")
-                    response = app.test_client().post("/analyze", json=dict(
+                    response = app.test_client().post("/analyze", json=dict(consent_to_model_processing=True, 
                         text=source, phase="in_deal", lang=lang, disclose_limits=True,
                         structured_rules=dict(RULES, payment_direction=direction)))
                     advice = response.json["tactical_advice"]
@@ -80,7 +80,7 @@ class GuardrailContinuity(unittest.TestCase):
         model = {"candidates": [{"content": {"parts": [{"text": '{"draft_reply":"Our limit is 8%."}'}]}}]}
         with patch("app.call_gemini_rest", return_value=model):
             for lang in ("en", "zh"):
-                s = app.test_client().post("/analyze", json=dict(text=OFFER, phase="in_deal", lang=lang, structured_rules=RULES)).json
+                s = app.test_client().post("/analyze", json=dict(consent_to_model_processing=True, text=OFFER, phase="in_deal", lang=lang, structured_rules=RULES)).json
                 self.assertEqual(s["dealguard_audit"]["violation_count"], 3)
                 for key in ("counter_question", "draft_reply"):
                     self.assertNotRegex(s["tactical_advice"][key], r"\d")
@@ -91,7 +91,7 @@ class GuardrailContinuity(unittest.TestCase):
         with patch("app.call_gemini_rest", return_value=model):
             for lang in ("zh", "en"):
                 for flag in (False, True):
-                    data = app.test_client().post("/analyze", json=dict(phase="post_deal", text=REJECTED, structured_rules=RULES,
+                    data = app.test_client().post("/analyze", json=dict(consent_to_model_processing=True, phase="post_deal", text=REJECTED, structured_rules=RULES,
                                                                       lang=lang, disclose_limits=flag)).json["tactical_advice"]
                     self.assertEqual("8%" in data["draft_reply"], flag)
                     self.assertEqual("45" in data["draft_reply"], flag)
