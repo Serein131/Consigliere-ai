@@ -12,7 +12,7 @@ DISCOUNT = r"(?:discount|price\s+(?:cut|reduction)|reduce\s+(?:the\s+)?price|降
 PAYMENT = r"(?:payment\s+terms?|payment\s+period|net\s+terms?|账期|付款期限|付款周期|回款周期)"
 EXCLUSIVITY = re.compile(r"\bexclusiv(?:e|ity)\b|独家|排他", re.I)
 NEGATIVE_EXCLUSIVE = re.compile(
-    r"\b(?:no|without|reject(?:ed)?|refus(?:e|ed)|declin(?:e|ed)|remove(?:d)?|"
+    r"\bnon[- ]exclusive\b|非(?:独家|排他)|\b(?:no|without|reject(?:ed)?|refus(?:e|ed)|declin(?:e|ed)|remove(?:d)?|"
     r"waiv(?:e|ed)|not\s+(?:accept|require|agree\s+to)|won'?t\s+accept)\b.{0,35}"
     r"\bexclusiv(?:e|ity)\b|"
     r"(?:不(?:接受|同意|需要|要求|签)|拒绝|取消|撤销|没有|无需|无|不含|不包括).{0,9}(?:独家|排他)|"
@@ -24,7 +24,7 @@ UNADDRESSED_EXCLUSIVE = re.compile(
     r"(?:独家|排他).{0,12}(?:尚未|还未|未|没有)(?:讨论|涉及|商定|决定)", re.I)
 REJECTED = re.compile(r"\b(?:reject(?:ed)?|refus(?:e|ed)|declin(?:e|ed)|won'?t\s+accept|not\s+accept(?:ed)?|turned\s+down)\b|拒绝|不接受|已否决|不考虑|不予接受|撤回", re.I)
 HISTORICAL = re.compile(r"\b(?:initially|originally|previously|earlier|formerly|used\s+to)\b|最初|原先|此前|之前|曾经|起初", re.I)
-CONFIRMED = re.compile(r"\b(?:agreed|accepted|settled|finalized|confirmed|signed|final)\b|最终|敲定|已同意|正式接受|确认", re.I)
+CONFIRMED = re.compile(r"\b(?:agreed|accepted|settled|finalized|confirmed|signed)\b|敲定|已同意|正式接受|确认", re.I)
 CHANGE = re.compile(r"\b(?:but|however|instead|then|now|finally|ultimately)\b|但是|但|不过|改为|后来|目前|最终|最后|现已", re.I)
 MONEY_REVIEW = (
     ("unlimited_liability", re.compile(r"\bunlimited\s+(?:liability|indemnification)\b|无限(?:责任|赔偿)",re.I)),
@@ -127,6 +127,8 @@ def _extract_numbered(clauses, kind):
             re.compile(PCT+r"\s*(?:的)?\s*"+DISCOUNT,re.I)
         ] if kind=="discount" else [
             re.compile(r"(?:payment\s+within\b|payment\s+terms?|payment\s+period|net\s*|账期|付款期限|付款周期|回款周期)\s*(?:of|is|at|:|：|为|是|达到|到)?\s*"+DAYS,re.I),
+            re.compile(r"\bnet[-\s]+(\d{1,4})\b(?!\.\d|[\d%]|\s*(?:days?\b|weeks?\b|months?\b|%))",re.I),
+            re.compile(DAYS+r"(?:内)?\s*付款",re.I),
             re.compile(DAYS+r"\s*(?:payment\s+terms?|payment\s+period|net\s*terms?|账期|付款期限|付款周期)",re.I)
         ])
         for pat in patterns:
@@ -227,8 +229,7 @@ def extract_term_mentions(text):
             re.search(r"\b(?:only|sole|exclusive)\s+(?:reseller|distributor|supplier)\b",clause,re.I)):
             # A negated exclusivity statement is positive scope evidence,
             # but not proof that the actual deal has been signed.
-            negative = bool(NEGATIVE_EXCLUSIVE.search(clause) or
-                            re.search(r"非(?:独家|排他)|\bnon[- ]exclusive\b",clause,re.I))
+            negative = bool(NEGATIVE_EXCLUSIVE.search(clause))
             rows.append({"field":"exclusivity",
                          "state":"not_required" if negative else state,
                          "value":None,"evidence":clause[:190]})

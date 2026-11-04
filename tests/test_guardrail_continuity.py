@@ -54,7 +54,7 @@ class GuardrailContinuity(unittest.TestCase):
                 for direction, days in [("maximum", 60), ("minimum", 30)]:
                     source = OFFER.replace("60 days", f"{days} days")
                     response = app.test_client().post("/analyze", json=dict(
-                        text=source, phase="in_deal", lang=lang,
+                        text=source, phase="in_deal", lang=lang, disclose_limits=True,
                         structured_rules=dict(RULES, payment_direction=direction)))
                     advice = response.json["tactical_advice"]
                     for key in ("counter_question", "draft_reply"):
@@ -65,3 +65,22 @@ class GuardrailContinuity(unittest.TestCase):
                         self.assertIn("排他" if lang == "zh" else "non-exclusive", reply)
                         if direction == "minimum":
                             self.assertIn("至少" if lang == "zh" else "at least", reply)
+
+    def test_bilingual_terms_and_ledger(self):
+        for phrase, expected in [("Net 45.", "PASS"), ("Net 46", "VIOLATION"), ("60天内付款", "VIOLATION"), ("账期待定", "UNKNOWN")]:
+            audit = check_deal(phrase, structured_rules=RULES)
+            self.assertEqual(audit["findings"][1]["status"], expected)
+        for phrase, status in [("a non-exclusive agreement", "PASS"), ("We require exclusivity", "VIOLATION"), ("terms pending", "UNKNOWN")]:
+            self.assertEqual(check_deal(phrase, structured_rules=RULES)["findings"][2]["status"], status)
+        for phrase, state in [(OFFER, "proposed"), ("We accepted a 9% discount.", "agreed")]:
+            self.assertEqual({m["state"] for m in check_deal(phrase, structured_rules=RULES)["term_mentions"]}, {state})
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "fixture"})
+    def test_default_replies_keep_limits_private(self):
+        model = {"candidates": [{"content": {"parts": [{"text": '{"draft_reply":"Our limit is 8%."}'}]}}]}
+        with patch("app.call_gemini_rest", return_value=model):
+            for lang in ("en", "zh"):
+                s = app.test_client().post("/analyze", json=dict(text=OFFER, phase="in_deal", lang=lang, structured_rules=RULES)).json
+                self.assertEqual(s["dealguard_audit"]["violation_count"], 3)
+                for key in ("counter_question", "draft_reply"):
+                    self.assertNotRegex(s["tactical_advice"][key], r"\d")
