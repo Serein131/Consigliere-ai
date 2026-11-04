@@ -45,7 +45,7 @@ jobs:
       - name: Continuous assurance loop — 36-case rules-only non-regression gate
         run: |
           python research/continuous_eval.py --suite research/live_alert_challenge_v54.json \
-            --out-dir /tmp/consigliere-eval --max-fn 3 --max-fp 2
+            --out-dir /tmp/consigliere-eval --max-fn 3 --max-fp 2 --expected-suite-git-sha1 ce4c3cf014c9c0fb7f141a62352c74ce3f197dc0
       - name: Attach continuous evaluation failures and provenance
         if: always()
         uses: actions/upload-artifact@v4
