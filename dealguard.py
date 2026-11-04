@@ -12,6 +12,7 @@ DISCOUNT = r"(?:discount|price\s+(?:cut|reduction)|reduce\s+(?:the\s+)?price|降
 PAYMENT = r"(?:payment\s+terms?|payment\s+period|net\s+terms?|账期|付款期限|付款周期|回款周期)"
 EXCLUSIVITY = re.compile(r"\bexclusiv(?:e|ity)\b|独家|排他", re.I)
 NEGATIVE_EXCLUSIVE = re.compile(
+    r"\bnon[- ]exclusive\b|非(?:独家|排他)|"
     r"\b(?:no|without|reject(?:ed)?|refus(?:e|ed)|declin(?:e|ed)|remove(?:d)?|"
     r"waiv(?:e|ed)|not\s+(?:accept|require|agree\s+to)|won'?t\s+accept)\b.{0,35}"
     r"\bexclusiv(?:e|ity)\b|"
@@ -107,7 +108,9 @@ def _parse_rules(rules_text, structured_rules):
 def _clauses(text):
     # Each clause is examined separately. A later final/agreed term takes priority
     # over an earlier proposal; conflicting or negated statements remain uncertain.
-    fragments = re.split(r"[;；。！？\n]|\bbut\b|\bhowever\b|\bfinally\b|\bultimately\b|但是|但|不过|最终|最后|后来|现已|改为",text,flags=re.I)
+    # English sentence boundaries must isolate rejection/history cues too.
+    # A period inside a decimal (e.g. 10.5%) is not a boundary.
+    fragments = re.split(r"[;；。！？!?\n]|\.(?!\d)|\bbut\b|\bhowever\b|\bfinally\b|\bultimately\b|但是|但|不过|最终|最后|后来|现已|改为",text,flags=re.I)
     return [c.strip(" ,，.:：\t") for c in fragments if c and c.strip(" ,，.:：\t")]
 
 def _phase(clause):
@@ -226,8 +229,7 @@ def extract_term_mentions(text):
             re.search(r"\b(?:only|sole|exclusive)\s+(?:reseller|distributor|supplier)\b",clause,re.I)):
             # A negated exclusivity statement is positive scope evidence,
             # but not proof that the actual deal has been signed.
-            negative = bool(NEGATIVE_EXCLUSIVE.search(clause) or
-                            re.search(r"非(?:独家|排他)|\bnon[- ]exclusive\b",clause,re.I))
+            negative = bool(NEGATIVE_EXCLUSIVE.search(clause))
             rows.append({"field":"exclusivity",
                          "state":"not_required" if negative else state,
                          "value":None,"evidence":clause[:190]})
