@@ -84,3 +84,16 @@ class GuardrailContinuity(unittest.TestCase):
                 self.assertEqual(s["dealguard_audit"]["violation_count"], 3)
                 for key in ("counter_question", "draft_reply"):
                     self.assertNotRegex(s["tactical_advice"][key], r"\d")
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "fixture"})
+    def test_post_deal_email_disclosure_is_independent(self):
+        model = {"candidates": [{"content": {"parts": [{"text": '{"draft_reply":"Internal: 8%, 45 days, private budget", "box1_text":"internal review"}'}]}}]}
+        with patch("app.call_gemini_rest", return_value=model):
+            for lang in ("zh", "en"):
+                for flag in (False, True):
+                    data = app.test_client().post("/analyze", json=dict(phase="post_deal", text=REJECTED, structured_rules=RULES,
+                                                                      lang=lang, disclose_limits=flag)).json["tactical_advice"]
+                    self.assertEqual("8%" in data["draft_reply"], flag)
+                    self.assertEqual("45" in data["draft_reply"], flag)
+                    self.assertNotIn("private budget", data["draft_reply"])
+                    self.assertEqual(data["box1_text"], "internal review")

@@ -211,6 +211,38 @@ def guarded_replies(findings, language, disclose):
             "draft_reply": f"Thank you for the offer. Please send a revised written proposal reflecting {limits}. We will review the full terms before making a commitment."}
 
 
+def follow_up_email(audit, language, disclose):
+    """Only public topic names and explicitly opted-in limits enter the email."""
+    zh = language == "zh"
+    fields = {row["field"] for row in audit["term_mentions"]}
+    names = [name for field, name in (
+        ("discount", "折扣" if zh else "the discount"),
+        ("payment", "付款期限" if zh else "payment timing"),
+        ("exclusivity", "排他安排" if zh else "exclusivity"),
+    ) if field in fields]
+    topics = ("、" if zh else ", ").join(names) or ("交易条款" if zh else "the commercial terms")
+    paragraphs = (["主题：请确认会谈条款", "您好，", f"感谢今天的讨论。请就{topics}提供书面说明，区分双方已确认的事项和仍待讨论的条件。"]
+                  if zh else ["Subject: Confirming the terms discussed", "Hello,",
+                              f"Thank you for the discussion. Could you confirm in writing where we stand on {topics}, distinguishing any agreed points from open questions?"])
+    if disclose:
+        cfg = audit["recognized_rules"]
+        limits = []
+        cap = cfg["discount_max_pct"]
+        if cap is not None:
+            limits.append(f"折扣不超过{cap:g}%" if zh else f"a discount of at most {cap:g}%")
+        for key, cn, en in (("payment_min_days", "至少", "at least"), ("payment_max_days", "不超过", "at most")):
+            days = cfg[key]
+            if days is not None:
+                limits.append(f"账期{cn}{days:g}天" if zh else f"payment terms of {en} {days:g} days")
+        if cfg["prohibit_exclusivity"]:
+            limits.append("非排他合作" if zh else "non-exclusive terms")
+        if limits:
+            paragraphs.append("我方审阅方案时采用的条件为：" + "、".join(limits) + "。" if zh
+                              else "Our requirements for review are " + ", ".join(limits) + ".")
+    paragraphs.append("收到完整方案后，我们会审阅并回复。" if zh else "We will review the full proposal and follow up.")
+    return "\n\n".join(paragraphs)
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze_negotiation():
     start_time = time.perf_counter()
@@ -414,6 +446,8 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
         disclose = payload.get("disclose_limits") is True
         if phase == "in_deal" and (not disclose or dealguard_audit["violation_count"]):
             tactical_output.update(guarded_replies(dealguard_audit["findings"], lang_pref, disclose))
+        if phase == "post_deal":
+            tactical_output["draft_reply"] = follow_up_email(dealguard_audit, lang_pref, disclose)
         latency_ms = round((time.perf_counter() - start_time) * 1000)
 
         return jsonify({
@@ -1785,8 +1819,10 @@ HTML_UI = r"""<!DOCTYPE html>
 
         function refreshStageView() {
             const phase=currentPhase;
-            document.getElementById('disclosure_control').style.display=phase==='in_deal'?'flex':'none';
-            document.getElementById('disclosure_label').textContent=currentLang==='zh'?'在本次会中对外话术中披露具体底线':'Include my exact limits in this in-deal reply';
+            document.getElementById('disclosure_control').style.display=phase==='pre_deal'?'none':'flex';
+            document.getElementById('disclosure_label').textContent=phase==='post_deal'
+                ? (currentLang==='zh'?'在这封跟进邮件中披露具体底线':'Include my exact limits in this follow-up email')
+                : currentLang==='zh'?'在本次会中对外话术中披露具体底线':'Include my exact limits in this in-deal reply';
             const l=STAGE_COPY[currentLang][phase];
             for (const p of ['pre_deal','in_deal','post_deal']) {
                 const button=document.getElementById('tab_'+p);
@@ -2555,7 +2591,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 const payload = {
                     structured_rules:getStructuredRules(),
                     phase: currentPhase,
-                    disclose_limits: currentPhase==='in_deal' && document.getElementById('disclose_limits').checked,
+                    disclose_limits: currentPhase!=='pre_deal' && document.getElementById('disclose_limits').checked,
                     lang: currentLang,
                     text: clientScrubbedText,
                     user_goal: clientSideRedact(document.getElementById('user_goal').value).sanitizedText,
