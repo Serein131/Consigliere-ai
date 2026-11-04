@@ -166,7 +166,7 @@ def hybrid_audit():
     return response
 
 
-def guarded_replies(findings, language):
+def guarded_replies(findings, language, disclose):
     """Build outward-facing wording from breached limits, never from the offered values."""
     zh = language == "zh"
     terms = []
@@ -187,6 +187,21 @@ def guarded_replies(findings, language):
                 terms.append(f"payment terms of {bound} {days} days")
         elif rule == "no_exclusivity":
             terms.append("取消排他要求" if zh else "non-exclusive terms")
+    if not disclose:
+        issues = {f["rule"] for f in findings if f["status"] == "VIOLATION"}
+        labels = [label for rule, label in (
+            ("maximum_discount_pct", "折扣" if zh else "discount"),
+            ("payment_days", "账期" if zh else "payment terms"),
+            ("no_exclusivity", "排他条款" if zh else "exclusivity"),
+        ) if rule in issues]
+        subject = ("、" if zh else ", ").join(labels)
+        if zh:
+            question = f"贵方可以怎样调整{subject}？" if subject else "贵方能否书面确认完整条款？"
+            draft = question + "请提供完整书面方案，供我们审阅后回复。"
+        else:
+            question = f"What flexibility do you have on {subject}?" if subject else "Could you confirm the full terms in writing?"
+            draft = question + " Please send the full proposal for review before we respond."
+        return {"counter_question": question, "draft_reply": draft}
     if zh:
         limits = "、".join(terms)
         return {"counter_question": f"贵方能否按以下条件调整报价：{limits}？",
@@ -390,14 +405,15 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
             tactical_output["risk_level"] = "MEDIUM"
         if dealguard_audit["violation_count"] > 0:
             tactical_output["risk_level"] = "CRITICAL"
-            if phase == "in_deal":
-                tactical_output.update(guarded_replies(dealguard_audit["findings"], lang_pref))
             prefix = "确定性规则审计检测到交易底线冲突。" if lang_pref == "zh" else "Deterministic rule audit detected explicit constraint violation."
             tactical_output["triggered_rule"] = prefix + " " + str(tactical_output.get("triggered_rule",""))
         elif dealguard_audit["assessment"] == "UNKNOWN" and tactical_output["risk_level"] == "SAFE":
             tactical_output["risk_level"] = "LOW"
         if dealguard_audit["commercial_risks"] and tactical_output["risk_level"] == "SAFE":
             tactical_output["risk_level"] = "LOW"
+        disclose = payload.get("disclose_limits") is True
+        if phase == "in_deal" and (not disclose or dealguard_audit["violation_count"]):
+            tactical_output.update(guarded_replies(dealguard_audit["findings"], lang_pref, disclose))
         latency_ms = round((time.perf_counter() - start_time) * 1000)
 
         return jsonify({
@@ -1183,6 +1199,10 @@ HTML_UI = r"""<!DOCTYPE html>
             <p class="stage-intro" id="mic_hint">Transcription is voluntary. Pause or stop at any time; it never automatically starts AI analysis.</p>
         </div>
         <div class="agent-action-panel" id="agent_action_panel">
+            <label class="agent-consent" id="disclosure_control" style="display:none">
+                <input id="disclose_limits" type="checkbox" onchange="clearDisclosureDraft()">
+                <span id="disclosure_label">Include my exact limits in the next in-deal reply</span>
+            </label>
             <label class="agent-consent" for="agent_consent">
                 <input id="agent_consent" type="checkbox">
                 <span id="agent_consent_text">I consent to sending sanitized fictional stage notes and decision context to the AI strategy provider.</span>
@@ -1520,6 +1540,7 @@ HTML_UI = r"""<!DOCTYPE html>
             document.getElementById('dg_chars').textContent=el.value.length+' / 3500';
         }
         function invalidateDealAudit(allowLiveSchedule=true) {
+            document.getElementById('disclose_limits').checked=false;
             auditInputRevision += 1;
             hybridReceipt = null;
             document.getElementById('dg_output').style.display='none';
@@ -1764,6 +1785,8 @@ HTML_UI = r"""<!DOCTYPE html>
 
         function refreshStageView() {
             const phase=currentPhase;
+            document.getElementById('disclosure_control').style.display=phase==='in_deal'?'flex':'none';
+            document.getElementById('disclosure_label').textContent=currentLang==='zh'?'在本次会中对外话术中披露具体底线':'Include my exact limits in this in-deal reply';
             const l=STAGE_COPY[currentLang][phase];
             for (const p of ['pre_deal','in_deal','post_deal']) {
                 const button=document.getElementById('tab_'+p);
@@ -1795,6 +1818,11 @@ HTML_UI = r"""<!DOCTYPE html>
             updateLiveUI();
         }
 
+        function clearDisclosureDraft(){
+            auditInputRevision++;
+            latestTacticalOutput=null;
+            document.getElementById('result').style.display='none';
+        }
         function setPhase(phase) {
             if(!['pre_deal','in_deal','post_deal'].includes(phase))return;
             // Stopping transcription on navigation never invokes model inference.
@@ -1802,6 +1830,7 @@ HTML_UI = r"""<!DOCTYPE html>
             if(liveAssist.active && phase!=='in_deal')stopLiveAssist();
             const editor=document.getElementById('input_text');
             stageDrafts[currentPhase]=editor.value;
+            document.getElementById('disclose_limits').checked=false;
             currentPhase=phase;
             editor.value=stageDrafts[phase]||'';
             invalidateDealAudit();
@@ -1838,6 +1867,8 @@ HTML_UI = r"""<!DOCTYPE html>
         }
 
         function resetSessionChain() {
+            document.getElementById('disclose_limits').checked=false;
+            clearDisclosureDraft();
             if(liveAssist.active)stopLiveAssist();
             sessionMemory = { pre_deal: null, in_deal: null, post_deal: null };
             updateSessionUI();
@@ -2144,10 +2175,10 @@ HTML_UI = r"""<!DOCTYPE html>
                 tradeOff:'Possible conditional trade-off, not a recommendation to concede:',
                 exclusiveQuestion:'Can we remove exclusivity or clarify its geographic scope, channels and duration before proceeding?',
                 exclusiveTrade:'Consider whether a limited volume commitment could replace exclusivity; confirm your own limits first.',
-                payMaxQuestion:'Could the payment period be reduced to at most {limit} days? If not, what security can you offer?',
-                payMinQuestion:'Could we agree to a payment window of at least {limit} days before committing?',
+                payMaxQuestion:'Could you shorten the payment period?',
+                payMinQuestion:'Could you extend the payment period?',
                 payTrade:'Consider documented milestones or payment security, without changing the agreed limits automatically.',
-                discountQuestion:'Could the discount stay at or below {limit}%? What scope or volume would support that?',
+                discountQuestion:'What flexibility do you have on the discount?',
                 discountTrade:'Explore scope or volume changes only if they independently serve your commercial goals.',
                 ledgerTitle:'Mentioned deal terms · source excerpts',
                 ledgerNote:'Chronology labels below are heuristic text cues, not independently verified agreement status or legal advice.',
@@ -2173,10 +2204,10 @@ HTML_UI = r"""<!DOCTYPE html>
                 tradeOff:'可探讨的附带交换条件（并非建议主动让步）：',
                 exclusiveQuestion:'能否取消独家条款？如不能，请先明确涉及的地区、渠道和期限。',
                 exclusiveTrade:'只有在符合自身目标时，才考虑用有限采购量承诺换取取消排他性。',
-                payMaxQuestion:'能否将付款期限控制在{limit}天以内？如不能，对方能提供什么付款保障？',
-                payMinQuestion:'能否先确认付款期限不少于{limit}天，再讨论其他条件？',
+                payMaxQuestion:'能否缩短付款期限？',
+                payMinQuestion:'能否延长付款期限？',
                 payTrade:'可探讨书面里程碑或付款保障，但不自动改变你的账期底线。',
-                discountQuestion:'折扣能否控制在{limit}%以内？哪些合作范围或采购量可以支持这个条件？',
+                discountQuestion:'贵方对折扣要求有哪些调整空间？',
                 discountTrade:'只有范围或交易量本身合理时，才考虑以此交换折扣条件。',
                 ledgerTitle:'已提及的交易条款 · 原文证据',
                 ledgerNote:'以下“已同意/已拒绝”等仅为文字线索的启发式标注，不代表已证明协议生效或法律效力。',
@@ -2524,6 +2555,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 const payload = {
                     structured_rules:getStructuredRules(),
                     phase: currentPhase,
+                    disclose_limits: currentPhase==='in_deal' && document.getElementById('disclose_limits').checked,
                     lang: currentLang,
                     text: clientScrubbedText,
                     user_goal: clientSideRedact(document.getElementById('user_goal').value).sanitizedText,
@@ -2574,9 +2606,8 @@ HTML_UI = r"""<!DOCTYPE html>
                 updatePillarHeaders();
 
                 const auditMsg = currentLang === 'zh'
-                    ? `🛡️ <strong>客户端正则脱敏已运行（不能保证覆盖全部敏感信息）：</strong>已在浏览器内存拦截替换 <b>${localRedactedCount}</b> 处敏感实体（无法确保所有敏感信息已删除） | ⏱️ <strong>实测耗时：</strong><b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>发送到分析接口的谈判文本（不含全部上下文）：</strong><code>${data.sanitized_payload_sent_to_llm}</code>`
-                    : `🛡️ <strong>Regex-based redaction applied (not a complete privacy guarantee):</strong> <b>${localRedactedCount}</b> possible identifiers replaced by client regex before network request | ⏱️ <strong>Latency:</strong> <b>${data.measured_latency_ms} ms</b> (${data.model_used})<br>📤 <strong>Negotiation text excerpt (not full request):</strong> <code>${data.sanitized_payload_sent_to_llm}</code>`;
-
+                    ? `正则脱敏（可能遗漏）：已替换 ${localRedactedCount} 处。耗时 ${data.measured_latency_ms} ms（${data.model_used}）。提交文本摘录：`
+                    : `Regex masking (may miss identifiers): ${localRedactedCount} replacements. Latency: ${data.measured_latency_ms} ms (${data.model_used}). Submitted excerpt: `;
                 const audit = data.dealguard_audit || {};
                 const findings = (audit.findings || []).map(f => f.rule + ': ' + f.status +
                     (f.observed === undefined ? '' : ' (observed: ' + f.observed + ')'));
@@ -2588,10 +2619,10 @@ HTML_UI = r"""<!DOCTYPE html>
                     (audit.commercial_risks || []).map(r=>'\n• '+r.code+': '+(r.evidence||'')).join('')+
                     (audit.rule_warnings || []).map(w=>'\n⚠ '+w).join('');
                 const auditView = document.getElementById('audit_view');
-                // Escape interpolated payload in HTML before rendering the status message.
-                const safeAuditMsg = auditMsg.replace(/<code>([\s\S]*?)<\/code>/g, (whole, content) =>
-                    '<code>' + content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>');
-                auditView.innerHTML = safeAuditMsg;
+                auditView.textContent = auditMsg;
+                const excerpt=document.createElement('code');
+                excerpt.textContent=data.sanitized_payload_sent_to_llm;
+                auditView.appendChild(excerpt);
                 auditView.appendChild(auditElement);
 
                 const badgeColor = t.risk_level === 'SAFE' ? '#059669' : (t.risk_level === 'LOW' ? '#d97706' : '#dc2626');

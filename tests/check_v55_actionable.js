@@ -104,7 +104,7 @@ async function test(){
   assert(founder.includes('45 days longer than your maximum'),'payment gap direction');
   assert(founder.includes('remove exclusivity'),'targeted exclusivity question');
   assert(founder.includes('payment period'),'targeted payment question');
-  assert(founder.includes('discount stay at or below'),'targeted discount question');
+  assert(founder.includes('flexibility do you have on the discount'),'targeted discount question');
   assert(founder.includes('proposed')||founder.includes('Proposal wording'));
   assert(!founder.includes('Can we revisit this term and confirm'),'old fixed response removed');
   assert(el.live_alerts.className.includes('risk'));
@@ -134,7 +134,7 @@ async function test(){
   const procurement=textOf();
   assert(procurement.includes('15 days') && procurement.includes('minimum 60 days'));
   assert(procurement.includes('45 days earlier than your minimum'));
-  assert(procurement.includes('at least 60 days'));
+  assert(procurement.includes('extend the payment period'));
   assert(procurement.includes('Not verified'),'discount is unknown');
 
   // User-test role 4: on-threshold PASS remains auditable with all checks.
@@ -159,7 +159,7 @@ async function test(){
   assert(manufacturer.includes('only reseller in the region'));
   assert(manufacturer.includes('source quote matched'));
   assert(manufacturer.includes('literal quote matching does not validate interpretation'));
-  assert(manufacturer.includes('discount stay at or below 6%'));
+  assert(manufacturer.includes('flexibility do you have on the discount'));
 
   // Bilingual output including direction and targeted questions.
   run("setLanguage('zh')");
@@ -169,7 +169,7 @@ async function test(){
   assert(chinese.includes('至少60天') || chinese.includes('至少60天'));
   assert(chinese.includes('提前45天'));
   assert(chinese.includes('能否取消独家条款'));
-  assert(chinese.includes('不少于60天'));
+  assert(chinese.includes('能否延长付款期限'));
 
   // Existing consent/security behavior must be preserved from the v5.4 suite.
   assert.equal(requests.length,0,'rendering never initiates a network/model request');
