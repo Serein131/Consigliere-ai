@@ -286,6 +286,9 @@ def analyze_negotiation():
     if len(payload["text"]) > 12000:
         return jsonify({"error": "PROPOSAL_TOO_LONG"}), 413
     incoming_text = payload["text"].strip()
+    # Browser UI consent is insufficient: direct API clients must also opt in.
+    if payload.get("consent_to_model_processing") is not True:
+        return jsonify({"error": "MODEL_CONSENT_REQUIRED"}), 400
     user_goal = str(payload.get("user_goal") or "")[:2000].strip()
     hard_bottom_line = str(payload.get("hard_bottom_line") or "")[:2000].strip()
     risk_preference = str(payload.get("risk_preference") or "")[:2000].strip()
@@ -2649,6 +2652,7 @@ HTML_UI = r"""<!DOCTYPE html>
 
                 const payload = {
                     structured_rules:getStructuredRules(),
+                    consent_to_model_processing:document.getElementById('agent_consent').checked,
                     phase: currentPhase,
                     disclose_limits: currentPhase!=='pre_deal' && document.getElementById('disclose_limits').checked,
                     lang: currentLang,
