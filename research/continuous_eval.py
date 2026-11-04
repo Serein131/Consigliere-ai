@@ -37,7 +37,7 @@ def digest(path):
 
 def git_blob_sha1(path):
     body = path.read_bytes()
-    return hashlib.sha1(b"blob " + str(len(body)).encode("ascii") + b"\\0" + body).hexdigest()
+    return hashlib.sha1(b"blob " + str(len(body)).encode("ascii") + bytes([0]) + body).hexdigest()
 
 
 def error_for(expected, actual):
