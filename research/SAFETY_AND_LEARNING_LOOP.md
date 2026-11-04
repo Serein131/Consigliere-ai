@@ -43,7 +43,7 @@ Threats to track: direct/indirect prompt injection, sensitive information disclo
 python research/continuous_eval.py \
   --suite research/live_alert_challenge_v54.json \
   --out-dir /tmp/consigliere-eval \
-  --max-fn 3 --max-fp 2 \
+  --max-fn 3 --max-fp 2 --max-unsafe-pass 0 \
   --expected-suite-git-sha1 ce4c3cf014c9c0fb7f141a62352c74ce3f197dc0
 ```
 
