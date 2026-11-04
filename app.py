@@ -166,6 +166,36 @@ def hybrid_audit():
     return response
 
 
+def guarded_replies(findings, language):
+    """Build outward-facing wording from breached limits, never from the offered values."""
+    zh = language == "zh"
+    terms = []
+    for finding in findings:
+        if finding["status"] != "VIOLATION":
+            continue
+        rule = finding["rule"]
+        if rule == "maximum_discount_pct":
+            cap = f'{finding["limit"]:g}%'
+            terms.append(f"折扣不超过{cap}" if zh else f"a discount of at most {cap}")
+        elif rule == "payment_days":
+            days = f'{finding["limit"]:g}'
+            minimum = finding["direction"] == "min"
+            if zh:
+                terms.append(f"账期至少{days}天" if minimum else f"账期不超过{days}天")
+            else:
+                bound = "at least" if minimum else "at most"
+                terms.append(f"payment terms of {bound} {days} days")
+        elif rule == "no_exclusivity":
+            terms.append("取消排他要求" if zh else "non-exclusive terms")
+    if zh:
+        limits = "、".join(terms)
+        return {"counter_question": f"贵方能否按以下条件调整报价：{limits}？",
+                "draft_reply": f"谢谢报价。请按以下条件提交修订后的书面方案：{limits}。我们会在收到完整条款后审阅。"}
+    limits = ", ".join(terms)
+    return {"counter_question": f"Could you revise the offer to reflect {limits}?",
+            "draft_reply": f"Thank you for the offer. Please send a revised written proposal reflecting {limits}. We will review the full terms before making a commitment."}
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze_negotiation():
     start_time = time.perf_counter()
@@ -360,6 +390,8 @@ Output ONLY a single valid JSON object with these exact 8 keys (no Markdown code
             tactical_output["risk_level"] = "MEDIUM"
         if dealguard_audit["violation_count"] > 0:
             tactical_output["risk_level"] = "CRITICAL"
+            if phase == "in_deal":
+                tactical_output.update(guarded_replies(dealguard_audit["findings"], lang_pref))
             prefix = "确定性规则审计检测到交易底线冲突。" if lang_pref == "zh" else "Deterministic rule audit detected explicit constraint violation."
             tactical_output["triggered_rule"] = prefix + " " + str(tactical_output.get("triggered_rule",""))
         elif dealguard_audit["assessment"] == "UNKNOWN" and tactical_output["risk_level"] == "SAFE":

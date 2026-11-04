@@ -44,3 +44,24 @@ class GuardrailContinuity(unittest.TestCase):
                            dict(audit_receipt="invalid")]:
                 self.assertEqual(client.post("/analyze", json={**payload, **change}).status_code, 409)
             self.assertEqual(model.call_count, 1)
+
+    @patch.dict(os.environ, {"GEMINI_API_KEY": "fixture"})
+    def test_copyable_replies_cannot_offer_a_limit_exception(self):
+        unsafe = '{"counter_question":"Accept 9%?","draft_reply":"Approve 9% for exclusivity."}'
+        model = {"candidates": [{"content": {"parts": [{"text": unsafe}]}}]}
+        with patch("app.call_gemini_rest", return_value=model):
+            for lang in ("zh", "en"):
+                for direction, days in [("maximum", 60), ("minimum", 30)]:
+                    source = OFFER.replace("60 days", f"{days} days")
+                    response = app.test_client().post("/analyze", json=dict(
+                        text=source, phase="in_deal", lang=lang,
+                        structured_rules=dict(RULES, payment_direction=direction)))
+                    advice = response.json["tactical_advice"]
+                    for key in ("counter_question", "draft_reply"):
+                        reply = advice[key]
+                        self.assertNotIn("9%", reply)
+                        self.assertIn("8%", reply)
+                        self.assertIn("45", reply)
+                        self.assertIn("排他" if lang == "zh" else "non-exclusive", reply)
+                        if direction == "minimum":
+                            self.assertIn("至少" if lang == "zh" else "at least", reply)
