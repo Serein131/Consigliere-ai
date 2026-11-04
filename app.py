@@ -2,6 +2,8 @@ import os
 import re
 import time
 import json
+import hashlib
+from itsdangerous import URLSafeSerializer, BadData
 import logging
 import http.client
 from flask import Flask, request, jsonify, render_template_string
@@ -112,6 +114,15 @@ def audit_only():
         payload.get("structured_rules")
     ))
 
+def audit_context(text, rules):
+    data = json.dumps([text.strip(), rules], sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(data.encode()).hexdigest()
+
+
+def audit_signer(key):
+    return URLSafeSerializer(key, salt="dealguard-strategy-audit-v1")
+
+
 @app.route("/hybrid-audit", methods=["POST"])
 def hybrid_audit():
     """Opt-in Gemini term extraction + deterministic evidence-grounded audit."""
@@ -141,6 +152,12 @@ def hybrid_audit():
         )
     except HybridError as exc:
         return jsonify({"error": exc.code}), exc.status_code
+    key = os.environ.get("GEMINI_API_KEY")
+    if key:
+        output["audit_receipt"] = audit_signer(key).dumps({
+            "context": audit_context(redacted["sanitized_text"], payload.get("structured_rules")),
+            "audit": output["audit"],
+        })
     output["term_mentions"] = extract_term_mentions(redacted["sanitized_text"])
     output["redacted_items_count"] = redacted["redaction_count"]
     response = jsonify(output)
@@ -188,6 +205,16 @@ def analyze_negotiation():
     if not api_key:
         return jsonify({"error": "GEMINI_API_KEY is not configured in Vercel environment."}), 500
 
+    receipt = payload.get("audit_receipt")
+    if phase == "in_deal" and receipt is not None:
+        try:
+            verified = audit_signer(api_key).loads(receipt)
+            if verified["context"] != audit_context(sanitized_text, payload.get("structured_rules")):
+                raise ValueError("stale context")
+            dealguard_audit = verified["audit"]
+        except (BadData, ValueError, KeyError, TypeError):
+            return jsonify({"error": "Audit no longer matches. Run the audit again."}), 409
+
     if lang_pref == "zh":
         lang_rule = """【语言纯度绝对铁律 (CRITICAL LANGUAGE PURITY)】:
 当前交互环境为纯中文。你输出的 JSON 中，除 'risk_level' 必须保留英文枚举字符串 ("SAFE", "LOW", "MEDIUM", "CRITICAL") 供前端样式绑定外，其余所有字段值（'trap_or_intent', 'triggered_rule', 'box1_text', 'box2_text', 'box3_text', 'counter_question', 'draft_reply'）必须 100% 使用流利、专业、地道的简体中文！
@@ -217,6 +244,7 @@ Objective: Analyze voluntarily provided text or user-controlled transcripts. Dis
 - Do not infer a safe transaction merely because the other party is cooperative. Explicitly check rule evidence.
 - Use only the configured structured thresholds and deterministic audit for rule conflicts; never assume fixed 10% or 45-day constraints.
 - In 'triggered_rule': Cite which exact Goal, Budget, or Hard Bottom Line was triggered or satisfied.
+- Preserve all audited violations when listing conflicts, and distinguish a proposal from a commitment.
 - In 'box1_text': [Verified Facts]: Objective terms explicitly stated by counterparty (zero speculation).
 - In 'box2_text': [Strategic Inferences]: Clearly labeled alternative interpretations; do not claim knowledge of the opponent's intentions.
 - In 'box3_text': [Unknowns to Probe]: Critical missing variables required to test their bluff or verify constraints.
@@ -1251,6 +1279,7 @@ HTML_UI = r"""<!DOCTYPE html>
         let stageDrafts = {pre_deal:'', in_deal:'', post_deal:''};
         let languageInitialized = false;
         let auditInputRevision = 0;
+        let hybridReceipt = null;
         const liveAssist = {active:false, timer:null, controller:null, sequence:0,
             lastSignature:'',lastSentAt:0,lastFinalTranscript:''};
         let activeAgentRequestPhase = null;
@@ -1460,6 +1489,7 @@ HTML_UI = r"""<!DOCTYPE html>
         }
         function invalidateDealAudit(allowLiveSchedule=true) {
             auditInputRevision += 1;
+            hybridReceipt = null;
             document.getElementById('dg_output').style.display='none';
             document.getElementById('dg_copilot_btn').style.display='none';
             document.getElementById('result').style.display='none';
@@ -1623,6 +1653,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 try{data=await response.json();}catch(e){throw new Error('HTTP '+response.status);}
                 if(!response.ok || data.error)throw new Error(l.errorCodes[data.error]||data.error||'HTTP '+response.status);
                 if(requestRevision!==auditInputRevision || currentPhase!=='in_deal')return;
+                hybridReceipt = mode === "hybrid" ? data.audit_receipt : null;
                 renderDealAudit(data,mode);
             }catch(e){
                 if(requestRevision!==auditInputRevision || currentPhase!=='in_deal')return;
@@ -2310,6 +2341,7 @@ HTML_UI = r"""<!DOCTYPE html>
                 if(!response.ok || data.error)throw Error(data.error||'HTTP '+response.status);
                 if(!liveAssist.active || currentPhase!=='in_deal' || document.hidden ||
                     requestSeq!==liveAssist.sequence || signature!==liveFingerprint())return;
+                hybridReceipt = mode === "hybrid" ? data.audit_receipt : null;
                 renderLiveAlert(data,mode);
                 updateLiveUI();
             }catch(e){
@@ -2422,6 +2454,7 @@ HTML_UI = r"""<!DOCTYPE html>
             if (isAgentRunning) return;
             if(isListening)stopMicInternal();
             const requestPhase=currentPhase;
+            const strategyRevision=auditInputRevision;
             const requestSource=document.getElementById('input_text').value;
             const errBox=document.getElementById('error_box');
             if(!requestSource.trim()){
@@ -2472,6 +2505,7 @@ HTML_UI = r"""<!DOCTYPE html>
                         }]))
                 };
 
+                if (requestPhase === 'in_deal' && hybridReceipt) payload.audit_receipt = hybridReceipt;
                 const res = await fetch('/analyze', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -2491,7 +2525,7 @@ HTML_UI = r"""<!DOCTYPE html>
                     throw new Error(data.error || `Request failed (HTTP ${res.status})`);
                 }
                 // Do not attach stale strategy to a new phase or changed input.
-                if(currentPhase!==requestPhase || document.getElementById('input_text').value!==requestSource)return;
+                if(strategyRevision!==auditInputRevision || currentPhase!==requestPhase || document.getElementById('input_text').value!==requestSource)return;
 
                 const t = data.tactical_advice;
                 latestTacticalOutput = t;
