@@ -43,7 +43,8 @@ Threats to track: direct/indirect prompt injection, sensitive information disclo
 python research/continuous_eval.py \
   --suite research/live_alert_challenge_v54.json \
   --out-dir /tmp/consigliere-eval \
-  --max-fn 3 --max-fp 2
+  --max-fn 3 --max-fp 2 \
+  --expected-suite-git-sha1 ce4c3cf014c9c0fb7f141a62352c74ce3f197dc0
 ```
 
 The **3 missed alerts / 2 false alerts** are the existing v5.4 36-case developer-authored rules-only diagnostic baseline, not acceptable production standards. The new gate is a *non-regression check* on that same synthetic suite, not proof of improvement. Reports include all per-case outcomes, failures, and blank review fields. The default output path is outside the repository to avoid accidentally publishing real cases.
