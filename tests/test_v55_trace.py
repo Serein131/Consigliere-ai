@@ -67,6 +67,21 @@ class EvidenceLedgerTests(unittest.TestCase):
         self.assertIn("term_mentions",response.json)
         self.assertNotIn("bob@example.com",str(response.json))
 
+    def test_rules_endpoint_isolates_sentences_and_agrees_with_nonexclusive_ledger(self):
+        app.config["TESTING"] = True
+        response = app.test_client().post("/audit", json={
+            "text": "We rejected a 15% discount. We request a 12% discount. A non-exclusive agreement.",
+            "structured_rules": RULES
+        })
+        self.assertEqual(response.status_code, 200)
+        findings = {f["rule"]: f for f in response.json["findings"]}
+        self.assertEqual(findings["maximum_discount_pct"]["status"], "VIOLATION")
+        self.assertEqual(findings["maximum_discount_pct"]["observed"], 12)
+        self.assertEqual(findings["no_exclusivity"]["status"], "PASS")
+        self.assertEqual(response.json["violation_count"], 1)
+        self.assertTrue(any(m["field"] == "exclusivity" and m["state"] == "not_required"
+                            for m in response.json["term_mentions"]))
+
     def test_hybrid_endpoint_sends_masked_mentions_without_another_ai_call(self):
         app.config["TESTING"]=True
         with patch("app.execute_hybrid") as fake:

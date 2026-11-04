@@ -100,5 +100,28 @@ class DealGuardTests(unittest.TestCase):
     def test_zh_exclusivity_not_discussed(self):
         self.check_state("会议尚未讨论排他问题。", "no_exclusivity", "UNKNOWN")
 
+    def test_rejection_does_not_leak_into_next_sentence(self):
+        for boundary in (". ", "! ", "? ", ".\n"):
+            with self.subTest(boundary=boundary):
+                self.check_state(
+                    "We rejected a 15% discount" + boundary + "We request a 12% discount.",
+                    "maximum_discount_pct", "VIOLATION")
+
+    def test_sentence_split_preserves_decimal_discount(self):
+        self.check_state("We agreed a 10.5% discount. Payment terms 30 days.",
+                         "maximum_discount_pct", "VIOLATION")
+
+    def test_nonexclusive_wording_passes(self):
+        for source in ("A non-exclusive agreement.", "A non exclusive agreement.",
+                       "双方同意非独家合作。", "双方同意非排他合作。"):
+            with self.subTest(source=source):
+                result = self.check_state(source, "no_exclusivity", "PASS")
+                mentions = [m for m in result["term_mentions"] if m["field"] == "exclusivity"]
+                self.assertEqual(mentions[0]["state"], "not_required")
+
+    def test_later_exclusive_demand_still_violates(self):
+        self.check_state("A non-exclusive agreement. We now require exclusivity.",
+                         "no_exclusivity", "VIOLATION")
+
 if __name__ == "__main__":
     unittest.main()
