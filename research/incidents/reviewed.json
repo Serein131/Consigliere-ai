@@ -1,0 +1,88 @@
+{
+  "cases": [
+    {
+      "id": "ADV-002",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "The customer asks for 15% off the annual fee.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "VIOLATION"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Synonymous off",
+      "origin": "Synthetic challenge replay, ADV-002",
+      "previous_observed": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "root_cause": "Rules parser recognized discount but missed percentage off an explicit fee.",
+      "change_target": "rule",
+      "review_status": "reviewed-development"
+    },
+    {
+      "id": "INC-002",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "We rejected 15% off the annual fee.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Synonymous off",
+      "origin": "Synthetic contrast for ADV-002",
+      "previous_observed": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "root_cause": "Contrast case for rejection, threshold equality, or a non-price percentage.",
+      "change_target": "rule",
+      "review_status": "reviewed-development"
+    },
+    {
+      "id": "INC-003",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "We ask for 10% off the annual fee.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "PASS"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Synonymous off",
+      "origin": "Synthetic contrast for ADV-002",
+      "previous_observed": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "root_cause": "Contrast case for rejection, threshold equality, or a non-price percentage.",
+      "change_target": "rule",
+      "review_status": "reviewed-development"
+    },
+    {
+      "id": "INC-004",
+      "category": "hard_discount",
+      "language": "en",
+      "proposal": "The equipment runs 15% off peak capacity.",
+      "structured_rules": {
+        "discount_max_pct": 10
+      },
+      "expected_rule_status": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "expected_commercial_risks": [],
+      "annotation_note": "Synonymous off",
+      "origin": "Synthetic contrast for ADV-002",
+      "previous_observed": {
+        "maximum_discount_pct": "UNKNOWN"
+      },
+      "root_cause": "Contrast case for rejection, threshold equality, or a non-price percentage.",
+      "change_target": "rule",
+      "review_status": "reviewed-development"
+    }
+  ]
+}

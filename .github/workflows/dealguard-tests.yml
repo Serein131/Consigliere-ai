@@ -42,11 +42,15 @@ jobs:
           python research/evaluate.py --cases research/challenge_cases.json --output research/challenge_report.md --json research/challenge_report.json
       - name: Measure v5.4 live alert sensitivity and false alarms on frozen synthetic cases
         run: python research/evaluate_live_alerts.py
+      - name: Replay reviewed incidents and write failure queue
+        run: python research/replay_incidents.py --output research/incident-report.json
       - name: Attach synthetic benchmark and failure report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dealguard-synthetic-benchmark
           path: |
+            research/incident-report.json
             research/benchmark_report.md
             research/benchmark_report.json
             research/challenge_report.md
