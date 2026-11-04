@@ -107,7 +107,7 @@ def _parse_rules(rules_text, structured_rules):
 def _clauses(text):
     # Each clause is examined separately. A later final/agreed term takes priority
     # over an earlier proposal; conflicting or negated statements remain uncertain.
-    fragments = re.split(r"[;；。！？\n]|\bbut\b|\bhowever\b|\bfinally\b|\bultimately\b|但是|但|不过|最终|最后|后来|现已|改为",text,flags=re.I)
+    fragments = re.split(r"[;；。！？\n]|(?<=[.!?])\s+|\b(?:and|then)\s+(?=(?:(?:we|they)\s+)?(?:accepted|agreed|rejected|required|requested|demanded)\b)|\bbut\b|\bhowever\b|\bfinally\b|\bultimately\b|但是|但|不过|最终|最后|后来|现已|改为",text,flags=re.I)
     return [c.strip(" ,，.:：\t") for c in fragments if c and c.strip(" ,，.:：\t")]
 
 def _phase(clause):
@@ -126,7 +126,7 @@ def _extract_numbered(clauses, kind):
             re.compile(DISCOUNT+r"\s*(?:of|by|is|at|:|：|为|是|达到|到|至)?\s*"+PCT,re.I),
             re.compile(PCT+r"\s*(?:的)?\s*"+DISCOUNT,re.I)
         ] if kind=="discount" else [
-            re.compile(r"(?:payment\s+terms?|payment\s+period|net\s*|账期|付款期限|付款周期|回款周期)\s*(?:of|is|at|:|：|为|是|达到|到)?\s*"+DAYS,re.I),
+            re.compile(r"(?:payment\s+within\b|payment\s+terms?|payment\s+period|net\s*|账期|付款期限|付款周期|回款周期)\s*(?:of|is|at|:|：|为|是|达到|到)?\s*"+DAYS,re.I),
             re.compile(DAYS+r"\s*(?:payment\s+terms?|payment\s+period|net\s*terms?|账期|付款期限|付款周期)",re.I)
         ])
         for pat in patterns:
@@ -173,7 +173,8 @@ def _exclusive_check(clauses):
     for i,clause in enumerate(clauses):
         if EXCLUSIVITY.search(clause):
             unaddressed=bool(UNADDRESSED_EXCLUSIVE.search(clause))
-            negated=bool(NEGATIVE_EXCLUSIVE.search(clause))
+            negated=bool(NEGATIVE_EXCLUSIVE.search(clause) or
+                         re.search(r"\b(?:rejected|declined|refused)\s+[^.;:!?]*,?\s+and\s+(?:the\s+)?exclusivity\b", clause, re.I))
             status="UNKNOWN" if unaddressed else ("PASS" if negated else "VIOLATION")
             hits.append({"rule":"no_exclusivity","status":status,
                          "evidence":clause[:120],"claim_status":"UNADDRESSED" if unaddressed else ("REJECTED" if negated else _phase(clause)),
