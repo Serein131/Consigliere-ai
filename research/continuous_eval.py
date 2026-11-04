@@ -148,8 +148,8 @@ def main():
         "# Consigliere AI — reproducible safety evaluation", "",
         "Synthetic developer-authored cases; **not independent expert validation**, "
         "not verified negotiation outcomes and not an evaluation of Gemini.", "",
-        f"Dataset SHA-256: \`{report['provenance']['suite_sha256']}\`",
-        f"DealGuard SHA-256: \`{report['provenance']['rule_engine_sha256']}\`", "",
+        f"Dataset SHA-256: `{report['provenance']['suite_sha256']}`",
+        f"DealGuard SHA-256: `{report['provenance']['rule_engine_sha256']}`", "",
         "| Metric | Result |", "|---|---:|",
         f"| Cases | {m['count']} |",
         f"| Risk caught (TP) | {m['tp']} |",
