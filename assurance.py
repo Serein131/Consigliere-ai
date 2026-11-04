@@ -5,6 +5,7 @@ attestation, legal opinion, or proof that the LLM interpreted source correctly.
 """
 from datetime import datetime, timezone
 import secrets
+import os
 
 TRACE_VERSION = "decision-trace-v1"
 VALID_STATES = {"VIOLATION", "PASS", "UNKNOWN", "NO_DETECTED_VIOLATION"}
@@ -39,6 +40,7 @@ def decision_trace(audit, *, mode="rules", model=None, phase="in_deal"):
             assessment = "UNKNOWN"
     return {
         "receipt_version": TRACE_VERSION,
+        "release_commit": os.environ.get("VERCEL_GIT_COMMIT_SHA") or None,
         "trace_id": secrets.token_hex(12),
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "pipeline": {

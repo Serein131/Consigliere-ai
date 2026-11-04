@@ -53,11 +53,15 @@ jobs:
           name: assurance-synthetic-evaluation
           path: /tmp/consigliere-eval/
           retention-days: 30
+      - name: Replay reviewed incidents and write failure queue
+        run: python research/replay_incidents.py --output research/incident-report.json
       - name: Attach synthetic benchmark and failure report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dealguard-synthetic-benchmark
           path: |
+            research/incident-report.json
             research/benchmark_report.md
             research/benchmark_report.json
             research/challenge_report.md

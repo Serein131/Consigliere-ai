@@ -124,6 +124,7 @@ def _extract_numbered(clauses, kind):
     for index, clause in enumerate(clauses):
         patterns = ([
             re.compile(DISCOUNT+r"\s*(?:of|by|is|at|:|：|为|是|达到|到|至)?\s*"+PCT,re.I),
+            re.compile(PCT+r"\s+off\s+(?:the\s+)?(?:(?:annual|monthly|listed)\s+)?(?:fee|price)\b",re.I),
             re.compile(PCT+r"\s*(?:的)?\s*"+DISCOUNT,re.I)
         ] if kind=="discount" else [
             re.compile(r"(?:payment\s+within\b|payment\s+terms?|payment\s+period|net\s*|账期|付款期限|付款周期|回款周期)\s*(?:of|is|at|:|：|为|是|达到|到)?\s*"+DAYS,re.I),
